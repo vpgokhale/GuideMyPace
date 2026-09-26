@@ -832,6 +832,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         <summary class="card-toggle-summary"><h2>1 · Load your questions</h2></summary>
         <div class="card-toggle-body">
           <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Works with a text-layer PDF, or a scan/photo via on-device OCR. Each question and its answer choices — lettered (A/B/C/D), numbered, or bulleted (•, -, etc.) — will be split apart automatically; fix anything that landed wrong on the next screen.</div></details>
+          <label class="field-label" for="examStudentName">Student name (optional — tags this session in the exported CSV)</label>
+          <input type="text" id="examStudentName" class="text-input" placeholder="e.g. Priya">
           <div class="row">
             <button class="btn-primary" id="examLoadPdfBtn">Load PDF</button>
           </div>
@@ -844,6 +846,25 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               <select id="ttsVoiceSelect"><option value="">Device default</option></select>
             </span>
             <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Used whenever the app reads a question, answer choice, or word aloud. Shows up to 3 female and 3 male voices — the most commonly used English (US) voices already built into this device, not fetched over the network. Leave it on "Device default" to let the browser pick, or choose one so the voice stays the same regardless of which one your browser happens to default to.</div></details>
+          </div>
+
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examSpeakerModeToggle">
+              Speaker mode
+            </label>
+            <span class="color-field">
+              Speed:
+              <select id="examSpeakerRateSelect">
+                <option value="0.5">0.5×</option>
+                <option value="0.75">0.75×</option>
+                <option value="1" selected>1× (Normal)</option>
+                <option value="1.25">1.25×</option>
+                <option value="1.5">1.5×</option>
+                <option value="2">2×</option>
+              </select>
+            </span>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">The device reads the question and each answer choice aloud instead of listening for the reader's own speech. The same flow still applies — answer choices only unlock once the question has been read, and each choice must be read before it can be picked — it's just driven by the device's own reading instead of speech recognition. Reads fluidly with no added pauses. Can be turned on or off, and the speed changed, at any time, including partway through a question set.</div></details>
           </div>
         </div>
       </details>
@@ -892,7 +913,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         <label class="field-label" for="examNotesInput">Notes — jot down your thinking</label>
         <textarea id="examNotesInput" class="text-input" style="min-height:70px"></textarea>
         <div class="row">
-          <button class="btn-primary" id="examReadyBtn">Show options</button>
+          <button class="btn-primary" id="examReadyBtn" disabled>Show options</button>
         </div>
       </div>
 
@@ -935,6 +956,23 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       <button class="btn-secondary" id="exportSessionCsvBtn">Export session summary CSV</button>
       <button class="btn-secondary" id="exportJsonBtn">Export JSON</button>
       <button class="btn-danger" id="clearLogBtn">Clear log</button>
+    </div>
+  </div>
+
+  <div class="card" id="examSessionLogCard" hidden>
+    <div class="card-heading">
+      <h2>3 · Session log</h2>
+      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Every time you submit a question set, a row is added here — export it to review a batch of results for one student.</div></details>
+    </div>
+    <div class="log-status-line" id="examLogStatusLine"></div>
+    <div style="overflow-x:auto"><table class="timing-table" id="examLogTable"><thead><tr>
+      <th>When</th><th>Student</th><th>Score</th><th>Words</th><th>Help used</th><th></th>
+    </tr></thead><tbody id="examLogTableBody"></tbody></table></div>
+    <div class="row">
+      <button class="btn-secondary" id="examExportWordCsvBtn">Export word-level CSV</button>
+      <button class="btn-secondary" id="examExportSessionCsvBtn">Export session summary CSV</button>
+      <button class="btn-secondary" id="examExportJsonBtn">Export JSON</button>
+      <button class="btn-danger" id="examClearLogBtn">Clear log</button>
     </div>
   </div>
 
@@ -984,6 +1022,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const readModeSection  = document.getElementById('readModeSection');
   const examModeSection  = document.getElementById('examModeSection');
   const sessionLogCard   = document.getElementById('sessionLogCard');
+  const examSessionLogCard = document.getElementById('examSessionLogCard');
+  const examStudentNameInput = document.getElementById('examStudentName');
+  const examLogStatusLine  = document.getElementById('examLogStatusLine');
+  const examLogTableBody   = document.getElementById('examLogTableBody');
+  const examExportWordCsvBtn    = document.getElementById('examExportWordCsvBtn');
+  const examExportSessionCsvBtn = document.getElementById('examExportSessionCsvBtn');
+  const examExportJsonBtn       = document.getElementById('examExportJsonBtn');
+  const examClearLogBtn         = document.getElementById('examClearLogBtn');
   const examLoadPdfBtn    = document.getElementById('examLoadPdfBtn');
   const examPdfInput      = document.getElementById('examPdfInput');
   const examPdfStatus     = document.getElementById('examPdfStatus');
@@ -1028,6 +1074,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const choralModeToggle  = document.getElementById('choralModeToggle');
   const choralWcpmInput   = document.getElementById('choralWcpmInput');
   const ttsVoiceSelect    = document.getElementById('ttsVoiceSelect');
+  const examSpeakerModeToggle = document.getElementById('examSpeakerModeToggle');
+  const examSpeakerRateSelect = document.getElementById('examSpeakerRateSelect');
   const coverToggle    = document.getElementById('coverToggle');
   const maskColorPicker = document.getElementById('maskColorPicker');
   const revealControls   = document.getElementById('revealControls');
@@ -1059,8 +1107,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let muteRecognitionUntil = 0; // Date.now() timestamp; ignore recognition results until this passes, so the
                                  // mic doesn't pick up the tail of the device's own voice as if it were the reader
   let isListening = false;
-  let justStartedListening = false; // true only for the very first helper-timer arm after "Start
-                                     // reading" is pressed — see scheduleHelperTimer's warm-up grace
   let userStopped = true; // true when the user hasn't asked to listen (guards auto-restart)
   let lastWcpm = null;     // words-correct-per-minute from the most recently finished session
   let lastElapsedMs = null;
@@ -1075,6 +1121,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let loggedThisAttempt = false; // guards against double-logging if Finish is pressed more than once
   let sessionLog = [];           // every completed reading, persisted locally (best-effort) for export/post-processing
   const LOG_STORAGE_KEY = 'readingCoachSessionLog_v1';
+  let examSessionLog = [];       // Exam mode's own persisted log, one entry per Submit — same idea as
+                                  // sessionLog above (persisted locally, exportable), kept in its own
+                                  // array/storage key so the two modes' logs never mix.
+  const EXAM_LOG_STORAGE_KEY = 'qAlongExamSessionLog_v1';
 
   // ---------- exam mode state ----------
   let examOptionTexts = [];   // raw editable strings for the "check the question" stage (single question being edited)
@@ -1101,6 +1151,29 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let examEngineCorrectionWord = null; // a skipped word currently "offered" for correction via TTS —
                                         // set null again once it's repeated correctly (-> helped) or a
                                         // new correction is offered
+  // Speaker mode: the device reads the question/option aloud via TTS instead of listening for the
+  // reader's own speech through examEngineRecognition — same reveal flow (see examEngineStartSpeaker/
+  // examEngineSpeakerFinish below), just driven by playback finishing rather than STT scoring every
+  // word. Toggled anytime via examSpeakerModeToggle; examEngineUsingSpeaker records which mechanism
+  // the CURRENT listening session actually started with, so flipping the toggle mid-play doesn't
+  // send Stop down the wrong path.
+  let examSpeakerMode = false;
+  let examEngineUsingSpeaker = false;
+  let examSpeakerUtterance = null; // the utterance currently being tracked, so a stale onboundary/
+                                    // onend from an utterance that was stopped/replaced is ignored
+  let examSpeakerRate = 1; // applied as utter.rate — set via examSpeakerRateSelect, a typical
+                            // video/podcast-style playback-speed scale
+  // Timer handles for the speaker-mode watchdog/keep-alive (see examEngineStartSpeaker below) —
+  // module-scoped (rather than local to that function) so examEngineStopSpeaker can always clear
+  // them directly, even if the browser never fires an onend/onerror event to clear them itself.
+  let examSpeakerStartWatchdog = null;
+  let examSpeakerKeepAliveTimer = null;
+  let examSpeakerHardWatchdog = null;
+  function examClearSpeakerTimers() {
+    clearTimeout(examSpeakerStartWatchdog); examSpeakerStartWatchdog = null;
+    clearInterval(examSpeakerKeepAliveTimer); examSpeakerKeepAliveTimer = null;
+    clearTimeout(examSpeakerHardWatchdog); examSpeakerHardWatchdog = null;
+  }
   const EXAM_PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   // ---------- helpers ----------
@@ -1651,14 +1724,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     if (helperTimerHandle) { clearTimeout(helperTimerHandle); helperTimerHandle = null; }
   }
 
-  // The very first time this arms after "Start reading" is pressed gets a short extra warm-up
-  // grace on top of the chosen delay (justStartedListening, set in startListening and consumed
-  // here exactly once): the speech recognizer needs a brief moment after start() to actually begin
-  // capturing audio, and a word spoken right as the reader presses Start can otherwise be missed
-  // entirely — heard by no one, then read aloud once the timer fires even though it was said
-  // correctly. Every word after the first uses the plain chosen delay, unaffected.
-  const HELPER_FIRST_WORD_WARMUP_MS = 700;
-
   function scheduleHelperTimer() {
     clearHelperTimer();
     if (!helperModeToggle.checked || !isListening) return;
@@ -1666,8 +1731,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
     const wordIndexAtSchedule = pointer;
     const delaySec = parseInt(helperDelaySelect.value, 10) || 5;
-    const delay = delaySec * 1000 + (justStartedListening ? HELPER_FIRST_WORD_WARMUP_MS : 0);
-    justStartedListening = false;
     helperTimerHandle = setTimeout(function () {
       helperTimerHandle = null;
       // Guard against the pointer having moved on (word already resolved) by the time this fires.
@@ -1676,7 +1739,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (!word || word.status !== 'pending') return;
       if (!helperModeToggle.checked || !isListening) return;
       triggerHelperPrompt(word);
-    }, delay);
+    }, delaySec * 1000);
   }
 
   function triggerHelperPrompt(word) {
@@ -2068,8 +2131,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     recognition.lang = 'en-US';
 
     recognition.onstart = function () {
-      // isListening is already true (set optimistically in startListening, before this fired) —
-      // this is just the first point we know the recognizer is actually running.
+      isListening = true;
       micDot.classList.add('live');
       micLabel.textContent = 'Stop reading';
       setStatus('Listening… read the highlighted text aloud.');
@@ -2152,12 +2214,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         setStatus('Microphone access was blocked. Allow microphone permission for this page and try again.', 'error');
         userStopped = true;
-        // The recognizer never actually started — undo the optimistic "listening" state from
-        // startListening so the UI doesn't keep showing the word as active/clickable-for-help
-        // when nothing is listening.
-        isListening = false;
-        justStartedListening = false;
-        renderWords();
       } else {
         setStatus('Speech recognition error: ' + event.error, 'error');
       }
@@ -2199,24 +2255,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     liveTimer.classList.remove('show');
   }
 
-  // isListening flips true here — synchronously, the moment "Start reading" is pressed — rather
-  // than waiting for the recognizer's own async onstart event, which can lag the click by a
-  // noticeable moment (mic permission/audio-pipeline setup). Until this flips, the current word
-  // shows no "listening" highlight and isn't clickable for help (see renderWords), so without this
-  // a reader can't ask for help on the very first word until something else triggers a re-render.
-  // The real helper-timer countdown still only starts once onstart actually confirms the
-  // recognizer is running (see scheduleHelperTimer), so this doesn't change when a word can be
-  // auto-resolved — only when it becomes visible and clickable. If the recognizer then fails to
-  // actually start (permission denied — see onerror above), this optimistic state is reverted.
   function startListening() {
     if (!recognition || words.length === 0) {
       if (words.length === 0) setStatus('Load some text first.', 'warn');
       return;
     }
     userStopped = false;
-    isListening = true;
-    justStartedListening = true;
-    renderWords();
     try { recognition.start(); } catch (e) { /* already started */ }
   }
 
@@ -2718,7 +2762,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // logic this mode uses.
 
   function examBuildWords(text) {
-    return text.split(/\s+/).filter(Boolean).map(raw => ({ raw, norm: normalize(raw), status: 'pending', attempts: 0, heard: [], helperTriggered: false }));
+    return text.split(/\s+/).filter(Boolean).map(raw => ({ raw, norm: normalize(raw), status: 'pending', attempts: 0, heard: [], helperTriggered: false, helperSource: null }));
   }
 
   // Best-effort split of raw pasted/extracted/OCR'd text into ONE OR MORE questions, each with
@@ -3141,9 +3185,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       raw: cleanStem,
       words: examBuildWords(cleanStem),
       scored: false,
+      mode: null, // 'read' | 'speaker' — which mode the stem was (most recently) read in; see examQuestionPlayBtn's click handler
       options: options.map(t => {
         const cleanOpt = examStripLeadingMarker(t);
-        return { raw: cleanOpt, words: examBuildWords(cleanOpt), scored: false, revealed: false };
+        return { raw: cleanOpt, words: examBuildWords(cleanOpt), scored: false, revealed: false, mode: null };
       }),
       selectedAnswer: -1,
       optionsStarted: false,
@@ -3154,7 +3199,24 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   // Shown under the question once it's been read, in place of a "Done — X% correct" readout —
   // a reminder that the active (light-blue) word can still be clicked for a spoken read-aloud.
+  // Only applies in Read mode — Speaker mode has no clickable-help word (the device already read
+  // everything), so it gets no hint text at all once scored.
   const EXAM_QUESTION_READ_HINT = 'Click on active word to be read aloud.';
+  function examQuestionHintText(q) {
+    if (!q || !q.scored) return '';
+    return q.mode === 'speaker' ? '' : EXAM_QUESTION_READ_HINT;
+  }
+
+  // "Show options" only becomes clickable once the reader has actually typed something into the
+  // notes box — jotting down their thinking before answer choices are revealed is the point.
+  // Collapsing an ALREADY-revealed panel (the same button, now reading "Hide options") is never
+  // blocked by this — clearing the notes afterward shouldn't strand the reader with an open panel
+  // they can't close.
+  function examUpdateReadyBtnGating() {
+    const q = examActiveQuestion();
+    if (!q) { examReadyBtn.disabled = true; return; }
+    examReadyBtn.disabled = !q.optionsRevealed && !examNotesInput.value.trim();
+  }
 
   function examUpdateSubmitVisibility() {
     const allAnswered = examQuestions.length > 0 && examQuestions.every(q => q.selectedAnswer !== -1);
@@ -3197,11 +3259,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examUpdateNavGating();
 
     examNotesInput.value = q.notes || '';
-    examQuestionStatus.textContent = q.scored ? EXAM_QUESTION_READ_HINT : '';
+    examQuestionStatus.textContent = examQuestionHintText(q);
     examNotesBlock.hidden = !q.scored;
     examOptionsBlock.hidden = !q.optionsRevealed;
     examAnswerBlock.hidden = !q.optionsStarted;
     examReadyBtn.textContent = q.optionsRevealed ? 'Hide options' : 'Show options';
+    examUpdateReadyBtnGating();
     if (q.optionsStarted) {
       examAnswerStatus.textContent = q.options.every(o => o.scored)
         ? 'All answer choices read — choose your answer below.'
@@ -3280,7 +3343,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       span.className = 'word ' + w.status;
       const isCurrent = examEngineTarget === 'question' && i === examEnginePointer;
       if (isCurrent) span.classList.add('current-target');
-      if (isCurrent && examEngineListening && w.status === 'pending') {
+      // No click-for-help in Speaker mode — the device is already reading everything aloud, so
+      // there's no STT-driven "stuck word" for a click to help with (see examEngineUsingSpeaker).
+      if (isCurrent && examEngineListening && !examEngineUsingSpeaker && w.status === 'pending') {
         span.classList.add('help-clickable');
         span.title = 'Click for help with this word';
         span.addEventListener('click', function () { examRequestHelpForWord(); });
@@ -3377,7 +3442,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         if (isCurrentWord) wSpan.classList.add('current-target');
         if (!opt.revealed) wSpan.classList.add('masked');
         if (examKeywordMatches(w.norm, notesKeywordSet)) wSpan.classList.add('keyword-match');
-        if (isCurrentWord && w.status === 'pending') {
+        if (isCurrentWord && !examEngineUsingSpeaker && w.status === 'pending') {
           wSpan.classList.add('help-clickable');
           wSpan.title = 'Click for help with this word';
           wSpan.addEventListener('click', function () { examRequestHelpForWord(); });
@@ -3424,6 +3489,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // recognition callback's call stack first avoids that.
   function examEngineSpeakCorrection(word) {
     word.helperTriggered = true;
+    word.helperSource = 'wrong-attempt';
     setTimeout(function () { speakTts(word.raw, null); }, 30);
   }
 
@@ -3472,7 +3538,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (w.helperTriggered) {
         examGiveUpOnWord(w);
       } else {
-        examTriggerHelperPrompt(w);
+        examTriggerHelperPrompt(w, 'auto');
       }
     }, delay);
   }
@@ -3483,8 +3549,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // not to withhold credit for a real correct answer. Only if it's STILL pending when the
   // follow-up timer fires (silence, or wrong attempts that never reached the 2-strike cutoff) does
   // examGiveUpOnWord mark it incorrect and move on, so the reader is never stuck forever.
-  function examTriggerHelperPrompt(word) {
+  // `source` ('auto' | 'manual') records which path triggered it — purely informational, surfaced
+  // in the session log (see examLogSession/examLogHelpTriggerText) so a teacher/parent can tell
+  // "read after 3s of silence" apart from "reader asked for help"; it never affects scoring.
+  function examTriggerHelperPrompt(word, source) {
     word.helperTriggered = true;
+    word.helperSource = source;
     speakTts(word.raw, null);
     examEngineRenderCallback();
     examScheduleHelperTimer(); // arm the follow-up "move on after 3 more seconds" countdown
@@ -3510,7 +3580,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const word = examEngineWords[examEnginePointer];
     if (!word || word.status !== 'pending') return;
     examClearHelperTimer();
-    examTriggerHelperPrompt(word);
+    examTriggerHelperPrompt(word, 'manual');
   }
 
   function examProcessWord(rawWord) {
@@ -3595,7 +3665,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examEngineTarget = target;
     examEngineWords = wordsArrRef;
     examEnginePointer = 0;
-    examEngineWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; });
+    examEngineWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; });
     examEngineOnDone = onDone;
     examEngineCorrectionWord = null;
   }
@@ -3619,6 +3689,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // auto-resolved — only when it becomes visible and clickable. If the recognizer then fails to
   // actually start (permission denied — see onerror below), this optimistic state is reverted.
   function examEngineStart() {
+    if (examSpeakerMode) {
+      examEngineUsingSpeaker = true;
+      examEngineStartSpeaker();
+      return;
+    }
+    examEngineUsingSpeaker = false;
     if (!examEngineRecognition || !examEngineWords.length) return;
     examEngineUserStopped = false;
     examEngineListening = true;
@@ -3629,8 +3705,139 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
 
   function examEngineStop() {
+    if (examEngineUsingSpeaker) { examEngineStopSpeaker(); return; }
     examEngineUserStopped = true;
     if (examEngineRecognition) { try { examEngineRecognition.stop(); } catch (e) { /* ignore */ } }
+  }
+
+  // ---- Speaker mode: reads the whole stem/option aloud via TTS and, once finished, resolves every
+  // word the same way a fully-correct STT reading would — advancing the same "onDone" callback
+  // (examOnQuestionDone / examOnOptionDone) that unlocks the next stage of the reveal flow. Words
+  // are progressively marked as the utterance passes them (via the `boundary` event, when the
+  // browser/voice supports it) purely for the on-screen highlight — not consistently supported
+  // everywhere, so the finish handler is authoritative and marks anything still pending regardless.
+  function examEngineStartSpeaker() {
+    if (!examEngineWords.length) return;
+    const wordsRef = examEngineWords;
+    examEngineUserStopped = false;
+    examEngineListening = true;
+    examEngineJustStarted = false;
+    examUpdatePlayButtons();
+    examEngineRenderCallback();
+
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      // No TTS available at all — don't leave the reader stuck; resolve immediately.
+      examEngineSpeakerFinish(wordsRef);
+      return;
+    }
+    examClearSpeakerTimers();
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    const fullText = wordsRef.map(function (w) { return w.raw; }).join(' ');
+    const spokenText = ttsPronounceable(fullText);
+    const utter = new SpeechSynthesisUtterance(spokenText);
+    const voice = getSelectedVoice();
+    if (voice) utter.voice = voice;
+    const rate = examSpeakerRate || 1;
+    utter.rate = rate; // scale of playback speed only — reading itself stays one continuous
+                        // utterance with no per-word pauses inserted at any speed
+    examSpeakerUtterance = utter;
+
+    // Best-effort char-index -> word-index mapping for the progressive highlight (approximate,
+    // since ttsPronounceable can change a word's length — e.g. "a" -> "uh" — but close enough for
+    // a progress cue; the finish handler doesn't depend on this being exact).
+    let cumulative = 0;
+    const wordStarts = spokenText.split(' ').map(function (w) {
+      const start = cumulative;
+      cumulative += w.length + 1;
+      return start;
+    });
+
+    // Chrome (and Chromium-based browsers) have two long-standing speechSynthesis bugs that would
+    // otherwise leave the reader stuck on the first word forever, waiting for an onend that never
+    // comes — exactly the reported symptom. speakTts above already works around the same class of
+    // bug for single-word prompts; the same two mitigations apply here, plus a hard ceiling so a
+    // Play press can never hang indefinitely no matter which variant of the bug is hit:
+    //   1) the queue can get stuck "paused" so speak() is accepted but onstart never fires — a
+    //      short watchdog nudges it with resume() if it hasn't started shortly after being queued.
+    //   2) even once started, an utterance can silently stop partway through with NO event firing
+    //      at all unless the queue is periodically nudged with pause()+resume() — done here every
+    //      few seconds while actually speaking.
+    //   3) belt-and-braces: a hard timeout sized from the word count and rate force-finishes the
+    //      question/option if neither mitigation above rescues it, guaranteeing forward progress.
+    // None of these add any delay to normal fluid reading — they only ever fire when the browser
+    // itself has already gone silent.
+    examSpeakerStartWatchdog = setTimeout(function () {
+      if (examSpeakerUtterance !== utter) return;
+      if (!utter._started) window.speechSynthesis.resume();
+    }, 300);
+    examSpeakerKeepAliveTimer = setInterval(function () {
+      if (examSpeakerUtterance !== utter) { clearInterval(examSpeakerKeepAliveTimer); return; }
+      if (!window.speechSynthesis.speaking) return;
+      try { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } catch (e) { /* ignore */ }
+    }, 10000);
+    // ~2.5 words/sec is already a slow speaking pace; tripling that estimate and scaling by rate
+    // gives a generous ceiling that's never hit during normal reading, only when the browser has
+    // truly gone silent.
+    const estimatedMs = Math.max(4000, (wordsRef.length / 2.5 / rate) * 1000 * 3);
+    examSpeakerHardWatchdog = setTimeout(function () {
+      if (examSpeakerUtterance !== utter) return;
+      try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+      examSpeakerUtterance = null;
+      examClearSpeakerTimers();
+      examEngineSpeakerFinish(wordsRef);
+    }, estimatedMs);
+
+    utter.onstart = function () { ttsSpeaking = true; utter._started = true; };
+    utter.onboundary = function (event) {
+      if (examSpeakerUtterance !== utter) return;
+      if (event.name && event.name !== 'word') return;
+      let idx = -1;
+      for (let i = wordStarts.length - 1; i >= 0; i--) {
+        if (event.charIndex >= wordStarts[i]) { idx = i; break; }
+      }
+      if (idx < 0 || idx >= wordsRef.length) return;
+      if (wordsRef[idx].status === 'pending') wordsRef[idx].status = 'correct';
+      examEnginePointer = Math.min(idx + 1, wordsRef.length);
+      examEngineRenderCallback();
+    };
+    utter.onend = function () {
+      ttsSpeaking = false;
+      muteRecognitionUntil = Date.now() + 400;
+      examClearSpeakerTimers();
+      if (examSpeakerUtterance !== utter) return;
+      examSpeakerUtterance = null;
+      examEngineSpeakerFinish(wordsRef);
+    };
+    utter.onerror = function () {
+      ttsSpeaking = false;
+      muteRecognitionUntil = Date.now() + 400;
+      examClearSpeakerTimers();
+      if (examSpeakerUtterance !== utter) return;
+      examSpeakerUtterance = null;
+      examEngineSpeakerFinish(wordsRef);
+    };
+    window.speechSynthesis.speak(utter);
+  }
+
+  function examEngineSpeakerFinish(wordsRef) {
+    wordsRef.forEach(function (w) { if (w.status === 'pending') w.status = 'correct'; });
+    examEnginePointer = wordsRef.length;
+    examEngineListening = false;
+    examUpdatePlayButtons();
+    examEngineRenderCallback();
+    const done = examEngineOnDone;
+    examEngineOnDone = null;
+    if (done) done();
+  }
+
+  function examEngineStopSpeaker() {
+    examSpeakerUtterance = null;
+    examClearSpeakerTimers();
+    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+    examEngineListening = false;
+    examUpdatePlayButtons();
+    examEngineRenderCallback();
   }
 
   const ExamSR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3690,14 +3897,19 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const q = examActiveQuestion();
     if (!q) return;
     q.scored = true;
-    examQuestionStatus.textContent = EXAM_QUESTION_READ_HINT;
+    examQuestionStatus.textContent = examQuestionHintText(q);
     examNotesBlock.hidden = false;
+    examUpdateReadyBtnGating();
   }
 
   function examToggleOptionPlay(idx) {
     primeTtsForSession();
-    if (!examEngineRecognition) {
+    if (!examSpeakerMode && !examEngineRecognition) {
       examAnswerStatus.textContent = "This browser doesn't support speech recognition, so it can't listen and check your answer choices — try Google Chrome or Microsoft Edge instead.";
+      return;
+    }
+    if (examSpeakerMode && !('speechSynthesis' in window)) {
+      examAnswerStatus.textContent = "This browser doesn't support text-to-speech, so Speaker mode can't read the answer choices aloud — try Google Chrome or Microsoft Edge instead.";
       return;
     }
     const q = examActiveQuestion();
@@ -3707,6 +3919,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       return;
     }
     q.options[idx].revealed = true;
+    q.options[idx].mode = examSpeakerMode ? 'speaker' : 'read';
     examCurrentOptionIndex = idx;
     examEngineSwitchTo('option', q.options[idx].words, function () { examOnOptionDone(idx); });
     examRenderOptionsList();
@@ -3803,6 +4016,20 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   // Builds one PDF with every question's color-annotated text, notes, and answer choices (the
   // selected one marked), entirely client-side via jsPDF — nothing is uploaded anywhere.
+  // "Read" (spoken by the student, STT-scored) vs "Speaker" (read aloud by the device) vs "Mixed"
+  // (the toggle was flipped partway through) — reported per question in the PDF (see examExportPdf)
+  // and per word in the session log (see examBuildLogWords/examLogSession), since the toggle can be
+  // switched at any time and different parts of the same question can end up in different modes.
+  function examModeLabel(mode) {
+    return mode === 'speaker' ? 'Speaker' : (mode === 'read' ? 'Read' : '—');
+  }
+  function examQuestionModeSummary(q) {
+    const distinct = Array.from(new Set([q.mode].concat(q.options.map(function (o) { return o.mode; })).filter(Boolean)));
+    if (!distinct.length) return '—';
+    if (distinct.length === 1) return examModeLabel(distinct[0]);
+    return 'Mixed';
+  }
+
   function examExportPdf() {
     if (typeof window.jspdf === 'undefined') {
       throw new Error('the PDF library did not load — check your internet connection and try again');
@@ -3830,10 +4057,17 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       doc.setFontSize(13);
       doc.setTextColor(0, 0, 0);
       doc.text('Question ' + (qi + 1), startX, cursor.y);
-      cursor.y += 20;
+      cursor.y += 16;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(107, 114, 128);
+      doc.text('Mode: ' + examQuestionModeSummary(q), startX, cursor.y);
+      cursor.y += 16;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
       cursor.x = startX;
       examPdfFlowWords(doc, examWordsToPdfEntries(q.words), cursor, flowOpts);
       cursor.y += 6;
@@ -3888,6 +4122,209 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const pad = n => String(n).padStart(2, '0');
     const stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     return stamp + ' q-along results.pdf';
+  }
+
+  // ---- Submit -> session log (persistent, multi-session — same architecture as Read mode's log) ----
+  // Exam mode's log mirrors Read mode's Session log exactly: a localStorage-backed array of past
+  // sessions (examSessionLog), an on-screen reverse-chronological table, and CSV/JSON exports —
+  // rather than a one-shot file downloaded per Submit. It covers every question's stem AND every
+  // answer choice, flattened into one word list per submitted attempt, plus something Read mode's
+  // log has no reason to track: WHICH of the three prompt paths actually triggered a spoken hint
+  // for a word — the reader manually clicking it for help, the 3-second auto-silence timer giving
+  // up and reading it aloud, or an automatic correction spoken right after a wrong attempt (see
+  // examTriggerHelperPrompt's `source` argument and examEngineSpeakCorrection).
+  const EXAM_LOG_HELP_SOURCE_LABELS = {
+    manual: 'Clicked for help',
+    auto: 'Auto — 3s of silence',
+    'wrong-attempt': 'Auto — after an incorrect attempt'
+  };
+
+  // What speech-to-text actually captured for this word, as a trail of attempts (dedupe just the
+  // consecutive-repeat noise a recognizer sometimes emits — same idiom as Read mode's timing
+  // table). heard[] only ever holds MISMATCHED attempts (see examProcessWord), so a word that
+  // eventually resolved correctly/with-help has its trail followed by the expected word itself —
+  // the one utterance that actually satisfied the match.
+  function examLogCapturedText(w) {
+    const heardTrail = (w.heard || []).filter(function (tok, i) { return tok !== w.heard[i - 1]; });
+    if (w.status === 'correct' || w.status === 'helped') {
+      return heardTrail.length ? heardTrail.concat(w.raw).join(' → ') : w.raw;
+    }
+    if (w.status === 'incorrect') {
+      return heardTrail.length ? heardTrail.join(' → ') : '(no response)';
+    }
+    if (w.status === 'skipped') {
+      return '(skipped — a later word matched instead)';
+    }
+    return '(not read)';
+  }
+
+  function examLogHelpTriggerText(w) {
+    if (!w.helperTriggered) return '—';
+    return EXAM_LOG_HELP_SOURCE_LABELS[w.helperSource] || 'Auto';
+  }
+
+  // Every word across every question's stem and answer choices, in order, tagged with which
+  // question/part it belongs to — the Exam-mode equivalent of Read mode's single flat `words`
+  // array (which only ever holds one passage's worth).
+  function examBuildLogWords() {
+    const flat = [];
+    examQuestions.forEach(function (q, qi) {
+      q.words.forEach(function (w) {
+        flat.push(Object.assign({ question: qi + 1, part: 'question', mode: q.mode }, w));
+      });
+      q.options.forEach(function (opt, oi) {
+        opt.words.forEach(function (w) {
+          flat.push(Object.assign({ question: qi + 1, part: 'option ' + String.fromCharCode(65 + oi), mode: opt.mode }, w));
+        });
+      });
+    });
+    return flat;
+  }
+
+  // 'read' | 'speaker' | 'mixed' — the mode(s) actually used across every part of the submitted
+  // attempt (the toggle can be flipped at any time, so a single submission can mix both).
+  function examOverallModeSummary(flatWords) {
+    const distinct = Array.from(new Set(flatWords.map(function (w) { return w.mode; }).filter(Boolean)));
+    if (!distinct.length) return null;
+    if (distinct.length === 1) return distinct[0];
+    return 'mixed';
+  }
+
+  function examLogSession() {
+    const flatWords = examBuildLogWords();
+    const total = flatWords.length;
+    const correct = flatWords.filter(function (w) { return w.status === 'correct'; }).length;
+    const helped = flatWords.filter(function (w) { return w.status === 'helped'; }).length;
+    const skipped = flatWords.filter(function (w) { return w.status === 'skipped'; }).length;
+    const incorrect = flatWords.filter(function (w) { return w.status === 'incorrect'; }).length;
+    const pct = total ? Math.round(((correct + helped) / total) * 100) : 0;
+    const entry = {
+      id: 'examlog_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      timestamp: new Date().toISOString(),
+      student: examStudentNameInput.value.trim(),
+      totalQuestions: examQuestions.length,
+      mode: examOverallModeSummary(flatWords),
+      total: total, correct: correct, helped: helped, skipped: skipped, incorrect: incorrect, pct: pct,
+      helperManual: flatWords.filter(function (w) { return w.helperSource === 'manual'; }).length,
+      helperAuto: flatWords.filter(function (w) { return w.helperSource === 'auto'; }).length,
+      helperWrongAttempt: flatWords.filter(function (w) { return w.helperSource === 'wrong-attempt'; }).length,
+      words: flatWords.map(function (w) {
+        return {
+          question: w.question, part: w.part, mode: w.mode, raw: w.raw, status: w.status, attempts: w.attempts,
+          heard: (w.heard || []).slice(), helperTriggered: w.helperTriggered, helperSource: w.helperSource
+        };
+      })
+    };
+    examSessionLog.push(entry);
+    examSaveLog();
+    examRenderLogPanel();
+  }
+
+  function examLoadLog() {
+    if (!canPersistLog) return;
+    try {
+      const raw = localStorage.getItem(EXAM_LOG_STORAGE_KEY);
+      if (raw) examSessionLog = JSON.parse(raw);
+    } catch (e) {
+      examSessionLog = [];
+    }
+  }
+
+  function examSaveLog() {
+    if (!canPersistLog) return;
+    try { localStorage.setItem(EXAM_LOG_STORAGE_KEY, JSON.stringify(examSessionLog)); } catch (e) { /* storage full or blocked — log still lives in memory for this visit */ }
+  }
+
+  function examUpdateLogStatusLine() {
+    const n = examSessionLog.length;
+    const countText = n === 0 ? 'No sessions logged yet.' : (n + ' session' + (n === 1 ? '' : 's') + ' logged.');
+    examLogStatusLine.textContent = countText + (canPersistLog
+      ? ' Saved in this browser — export a copy before you clear your browser data.'
+      : ' This browser won\'t keep it after the page is closed — export before you\'re done for the day.');
+  }
+
+  function examRenderLogPanel() {
+    examUpdateLogStatusLine();
+    examLogTableBody.innerHTML = '';
+    if (!examSessionLog.length) {
+      const tr = document.createElement('tr');
+      tr.className = 'log-empty';
+      tr.innerHTML = '<td colspan="6">No sessions logged yet — submit a question set above to add one.</td>';
+      examLogTableBody.appendChild(tr);
+      return;
+    }
+    [...examSessionLog].reverse().forEach(function (entry) {
+      const tr = document.createElement('tr');
+      const when = new Date(entry.timestamp).toLocaleString();
+      const helpUsed = entry.helperManual + entry.helperAuto + entry.helperWrongAttempt;
+      tr.innerHTML =
+        '<td>' + escapeHtml(when) + '</td>' +
+        '<td>' + escapeHtml(entry.student || '—') + '</td>' +
+        '<td>' + entry.pct + '%</td>' +
+        '<td>' + (entry.correct + entry.helped) + '/' + entry.total + '</td>' +
+        '<td>' + helpUsed + '</td>' +
+        '<td></td>';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-secondary btn-xs';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Remove this entry';
+      delBtn.addEventListener('click', function () {
+        examSessionLog = examSessionLog.filter(function (e) { return e.id !== entry.id; });
+        examSaveLog();
+        examRenderLogPanel();
+      });
+      tr.lastElementChild.appendChild(delBtn);
+      examLogTableBody.appendChild(tr);
+    });
+  }
+
+  function examClearLog() {
+    if (!examSessionLog.length) return;
+    if (!confirm('Clear all ' + examSessionLog.length + ' logged session(s)? This can\'t be undone — export a copy first if you need one.')) return;
+    examSessionLog = [];
+    examSaveLog();
+    examRenderLogPanel();
+  }
+
+  // Same 'read'/'speaker'/null vocabulary examLogSession stores — capitalized ('Read'/'Speaker') for
+  // the CSV, '—' for a word whose part was somehow never actually engaged.
+  function examLogModeText(mode) {
+    return mode === 'speaker' ? 'Speaker' : (mode === 'read' ? 'Read' : '—');
+  }
+
+  function examExportWordCsv() {
+    if (!examSessionLog.length) { examLogStatusLine.textContent = 'No logged sessions to export yet.'; return; }
+    const rows = [['session_id', 'timestamp', 'student', 'session_score_pct', 'question', 'part', 'mode', 'word_index', 'word', 'status',
+      'soundout_attempts', 'help_trigger', 'captured_speech_to_text']];
+    examSessionLog.forEach(function (entry) {
+      entry.words.forEach(function (w, idx) {
+        rows.push([
+          entry.id, entry.timestamp, entry.student, entry.pct,
+          w.question, w.part, examLogModeText(w.mode), idx, w.raw, w.status,
+          w.attempts,
+          examLogHelpTriggerText(w),
+          examLogCapturedText(w)
+        ]);
+      });
+    });
+    downloadFile('q-along-exam-word-level-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
+  }
+
+  function examExportSessionCsv() {
+    if (!examSessionLog.length) { examLogStatusLine.textContent = 'No logged sessions to export yet.'; return; }
+    const rows = [['session_id', 'timestamp', 'student', 'mode', 'total_questions', 'total_words', 'correct', 'helped', 'skipped', 'incorrect',
+      'pct_correct', 'help_manual_clicks', 'help_auto_silence', 'help_after_wrong_attempt']];
+    examSessionLog.forEach(function (entry) {
+      const modeText = entry.mode === 'mixed' ? 'Mixed' : examLogModeText(entry.mode);
+      rows.push([entry.id, entry.timestamp, entry.student, modeText, entry.totalQuestions, entry.total, entry.correct, entry.helped,
+        entry.skipped, entry.incorrect, entry.pct, entry.helperManual, entry.helperAuto, entry.helperWrongAttempt]);
+    });
+    downloadFile('q-along-exam-session-summary-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
+  }
+
+  function examExportJsonLog() {
+    if (!examSessionLog.length) { examLogStatusLine.textContent = 'No logged sessions to export yet.'; return; }
+    downloadFile('q-along-exam-log-' + Date.now() + '.json', JSON.stringify(examSessionLog, null, 2), 'application/json');
   }
 
   // ---------- wire up ----------
@@ -3967,6 +4404,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       ? 'Load a question set, then work through it with reading support and answer-choice help.'
       : 'Type or paste text, then read it aloud. Words turn <b style="color:#16a34a">green</b> as you read them correctly, <b style="color:#b45309">yellow</b> if you skip ahead past them, and <b style="color:#dc2626">red</b> if what you said didn\'t match.';
     // The session log only ever tracks Read mode passages — keep it out of the way in Exam mode.
+    // Exam mode still logs every Submit in the background (see examLogSession) and exports the
+    // word-level CSV automatically from the Submit button — its own on-screen log card stays
+    // hidden in both modes (see #examSessionLogCard's `hidden` attribute).
     sessionLogCard.hidden = examSelected;
     // Don't leave a reading session listening in the background once its screen is hidden.
     if (examSelected && isListening) stopListening();
@@ -4018,8 +4458,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   examQuestionPlayBtn.addEventListener('click', function () {
     primeTtsForSession();
-    if (!examEngineRecognition) {
+    if (!examSpeakerMode && !examEngineRecognition) {
       examQuestionStatus.textContent = "This browser doesn't support speech recognition, so it can't listen and check your reading — try Google Chrome or Microsoft Edge instead.";
+      return;
+    }
+    if (examSpeakerMode && !('speechSynthesis' in window)) {
+      examQuestionStatus.textContent = "This browser doesn't support text-to-speech, so Speaker mode can't read the question aloud — try Google Chrome or Microsoft Edge instead.";
       return;
     }
     const q = examActiveQuestion();
@@ -4028,9 +4472,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examEngineStop();
       return;
     }
+    q.mode = examSpeakerMode ? 'speaker' : 'read';
     examEngineSwitchTo('question', q.words, examOnQuestionDone);
     examRenderQuestionArea();
-    examQuestionStatus.textContent = 'Listening… read the question aloud.';
+    examQuestionStatus.textContent = examSpeakerMode ? 'Reading the question aloud…' : 'Listening… read the question aloud.';
     examEngineStart();
   });
 
@@ -4038,6 +4483,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const q = examActiveQuestion();
     if (!q) return;
     q.notes = examNotesInput.value;
+    examUpdateReadyBtnGating();
     if (q.optionsRevealed) examRenderOptionsList();
   });
 
@@ -4050,6 +4496,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       q.optionsRevealed = false;
       examOptionsBlock.hidden = true;
       examReadyBtn.textContent = 'Show options';
+      examUpdateReadyBtnGating();
       return;
     }
     if (!q.optionsStarted) {
@@ -4062,18 +4509,63 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     q.optionsRevealed = true;
     examOptionsBlock.hidden = false;
     examReadyBtn.textContent = 'Hide options';
+    examUpdateReadyBtnGating();
     examRenderOptionsList();
+  });
+
+  examSpeakerModeToggle.addEventListener('change', function () {
+    examSpeakerMode = examSpeakerModeToggle.checked;
+  });
+
+  examSpeakerRateSelect.addEventListener('change', function () {
+    examSpeakerRate = parseFloat(examSpeakerRateSelect.value) || 1;
   });
 
   examSubmitBtn.addEventListener('click', function () {
     examSubmitStatus.textContent = 'Generating PDF…';
+    let pdfOk = false;
     try {
       examExportPdf();
-      examSubmitStatus.textContent = 'PDF downloaded — check your downloads folder.';
+      pdfOk = true;
     } catch (e) {
       examSubmitStatus.textContent = 'Could not generate the PDF (' + e.message + ').';
     }
+    // Logging this attempt, and exporting the word-level CSV, are each a separate step with their
+    // own try/catch — a problem with one shouldn't be reported as a failure of another, and
+    // shouldn't stop the others from happening. The session log itself has no visible screen in
+    // Exam mode, so the word-level CSV is downloaded automatically here rather than requiring a
+    // click on a hidden export button.
+    let logOk = false;
+    try {
+      examLogSession();
+      logOk = true;
+    } catch (e) {
+      if (pdfOk) examSubmitStatus.textContent = 'PDF downloaded, but logging this session failed (' + e.message + ').';
+    }
+    // Firing two downloads back-to-back from the same click can trip a browser's "multiple
+    // automatic downloads" guard, which silently drops one of them (most browsers allow only one
+    // download per user gesture without a brief gap). A short delay before the second download
+    // lets both the PDF and the CSV come through reliably.
+    if (logOk) {
+      setTimeout(function () {
+        let csvOk = false;
+        try {
+          examExportWordCsv();
+          csvOk = true;
+        } catch (e) {
+          examSubmitStatus.textContent = 'PDF downloaded, but the word-level CSV export failed (' + e.message + ').';
+        }
+        if (pdfOk && csvOk) {
+          examSubmitStatus.textContent = 'PDF and word-level CSV downloaded — check your downloads folder.';
+        }
+      }, 400);
+    }
   });
+
+  examExportWordCsvBtn.addEventListener('click', examExportWordCsv);
+  examExportSessionCsvBtn.addEventListener('click', examExportSessionCsv);
+  examExportJsonBtn.addEventListener('click', examExportJsonLog);
+  examClearLogBtn.addEventListener('click', examClearLog);
 
   helperModeToggle.addEventListener('change', function () {
     if (helperModeToggle.checked) {
@@ -4117,6 +4609,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
   loadLog();
   renderLogPanel();
+  examLoadLog();
+  examRenderLogPanel();
   loadText();
 })();
 </script>
