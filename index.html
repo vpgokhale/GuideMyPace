@@ -850,12 +850,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
           <div class="cover-controls">
             <label class="cover-toggle-label">
-              <input type="checkbox" id="examSpeakerModeToggle">
+              <input type="checkbox" id="examSpeakerModeToggle" checked>
               Speaker mode
             </label>
             <span class="color-field">
               Speed:
               <select id="examSpeakerRateSelect">
+                <option value="0.25">0.25×</option>
                 <option value="0.5">0.5×</option>
                 <option value="0.75">0.75×</option>
                 <option value="1" selected>1× (Normal)</option>
@@ -864,7 +865,15 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
                 <option value="2">2×</option>
               </select>
             </span>
-            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">The device reads the question and each answer choice aloud instead of listening for the reader's own speech. The same flow still applies — answer choices only unlock once the question has been read, and each choice must be read before it can be picked — it's just driven by the device's own reading instead of speech recognition. Reads fluidly with no added pauses. Can be turned on or off, and the speed changed, at any time, including partway through a question set.</div></details>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Speaker mode will enable all text to be read aloud. When unchecked, the application will be listening for the reader's own speech. In either mode, the same flow applies — answer choices only unlock once the question has been processed, and each choice must be processed before a selection can be made.</div></details>
+          </div>
+
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examDebugModeToggle">
+              Debug mode
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Off by default. When checked, pressing Submit also logs the session and automatically downloads a word-level CSV, in addition to the PDF. Leave unchecked for a plain PDF-only submission.</div></details>
           </div>
         </div>
       </details>
@@ -1076,6 +1085,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const ttsVoiceSelect    = document.getElementById('ttsVoiceSelect');
   const examSpeakerModeToggle = document.getElementById('examSpeakerModeToggle');
   const examSpeakerRateSelect = document.getElementById('examSpeakerRateSelect');
+  const examDebugModeToggle = document.getElementById('examDebugModeToggle');
   const coverToggle    = document.getElementById('coverToggle');
   const maskColorPicker = document.getElementById('maskColorPicker');
   const revealControls   = document.getElementById('revealControls');
@@ -1157,12 +1167,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // word. Toggled anytime via examSpeakerModeToggle; examEngineUsingSpeaker records which mechanism
   // the CURRENT listening session actually started with, so flipping the toggle mid-play doesn't
   // send Stop down the wrong path.
-  let examSpeakerMode = false;
+  let examSpeakerMode = true; // on by default — matches examSpeakerModeToggle's default checked state
   let examEngineUsingSpeaker = false;
   let examSpeakerUtterance = null; // the utterance currently being tracked, so a stale onboundary/
                                     // onend from an utterance that was stopped/replaced is ignored
-  let examSpeakerRate = 1; // applied as utter.rate — set via examSpeakerRateSelect, a typical
-                            // video/podcast-style playback-speed scale
+  let examSpeakerRate = 1; // the dropdown's own multiplier — set via examSpeakerRateSelect, a
+                            // typical video/podcast-style playback-speed scale
+  // The dropdown's multiplier is applied on top of this base scale, not directly as utter.rate —
+  // a raw rate of 1.0 (the browser's native "normal" speed) reads too fast for a struggling
+  // reader to follow even at the dropdown's "0.5x" setting, so every option is slowed down by the
+  // same proportion: "1x (Normal)" ends up sounding like an unhurried, clear read rather than the
+  // engine's own default pace, and "0.5x" is noticeably slower still.
+  const EXAM_SPEAKER_RATE_SCALE = 0.6;
   // Timer handles for the speaker-mode watchdog/keep-alive (see examEngineStartSpeaker below) —
   // module-scoped (rather than local to that function) so examEngineStopSpeaker can always clear
   // them directly, even if the browser never fires an onend/onerror event to clear them itself.
@@ -1174,6 +1190,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     clearInterval(examSpeakerKeepAliveTimer); examSpeakerKeepAliveTimer = null;
     clearTimeout(examSpeakerHardWatchdog); examSpeakerHardWatchdog = null;
   }
+  // Debug mode: off by default. Submitting always downloads the PDF; only when this is checked
+  // does Submit also write to the persistent session log and auto-download the word-level CSV —
+  // everyday use just wants the PDF, and the debug artifacts are for troubleshooting only.
+  let examDebugMode = false;
   const EXAM_PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   // ---------- helpers ----------
@@ -3738,7 +3758,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const utter = new SpeechSynthesisUtterance(spokenText);
     const voice = getSelectedVoice();
     if (voice) utter.voice = voice;
-    const rate = examSpeakerRate || 1;
+    const rate = (examSpeakerRate || 1) * EXAM_SPEAKER_RATE_SCALE;
     utter.rate = rate; // scale of playback speed only — reading itself stays one continuous
                         // utterance with no per-word pauses inserted at any speed
     examSpeakerUtterance = utter;
@@ -3779,7 +3799,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     // ~2.5 words/sec is already a slow speaking pace; tripling that estimate and scaling by rate
     // gives a generous ceiling that's never hit during normal reading, only when the browser has
     // truly gone silent.
-    const estimatedMs = Math.max(4000, (wordsRef.length / 2.5 / rate) * 1000 * 3);
+    const estimatedMs = Math.round(Math.max(4000, (wordsRef.length / 2.5 / rate) * 1000 * 3));
     examSpeakerHardWatchdog = setTimeout(function () {
       if (examSpeakerUtterance !== utter) return;
       try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
@@ -4521,6 +4541,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examSpeakerRate = parseFloat(examSpeakerRateSelect.value) || 1;
   });
 
+  examDebugModeToggle.addEventListener('change', function () {
+    examDebugMode = examDebugModeToggle.checked;
+  });
+
   examSubmitBtn.addEventListener('click', function () {
     examSubmitStatus.textContent = 'Generating PDF…';
     let pdfOk = false;
@@ -4530,6 +4554,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     } catch (e) {
       examSubmitStatus.textContent = 'Could not generate the PDF (' + e.message + ').';
     }
+
+    // Logging the session and auto-downloading the word-level CSV are debug artifacts, not part
+    // of an everyday submission — only run them when Debug mode is checked.
+    if (!examDebugMode) {
+      if (pdfOk) examSubmitStatus.textContent = 'PDF downloaded — check your downloads folder.';
+      return;
+    }
+
     // Logging this attempt, and exporting the word-level CSV, are each a separate step with their
     // own try/catch — a problem with one shouldn't be reported as a failure of another, and
     // shouldn't stop the others from happening. The session log itself has no visible screen in
@@ -4597,6 +4629,23 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   window.addEventListener('resize', function () {
     if (resizeTimer) clearTimeout(resizeTimer);
     resizeTimer = setTimeout(renderWords, 150);
+  });
+
+  // The very first speechSynthesis.speak() call in a page session can carry a real, sometimes
+  // multi-second, startup delay while the browser's native TTS engine spins up — after that one
+  // call, every later speak() starts immediately. primeTtsForSession() (above) exists to absorb
+  // that one-time delay, but it was only ever invoked at the exact moment of the first Play press
+  // (see micBtn/examQuestionPlayBtn/examToggleOptionPlay's click handlers) — so the delay landed
+  // squarely on that first press, which is exactly the "long pause before it starts reading, but
+  // instant after Stop then Play again" behavior reported. Priming on the page's very first
+  // click/keypress/touch instead — almost always something earlier, like loading a file, typing a
+  // question, or checking a box, all of which happen before a Play button is even reachable — lets
+  // that startup delay resolve in the background well before the reader presses Play for real.
+  // primeTtsForSession() itself is a no-op after the first call (see its own ttsPrimed guard), so
+  // this is purely an earlier trigger, not a second unlock; the existing calls right in the Play
+  // handlers stay in place as a fallback for the rare case where Play truly is the first gesture.
+  ['pointerdown', 'touchstart', 'keydown'].forEach(function (evt) {
+    document.addEventListener(evt, primeTtsForSession, { once: true, capture: true });
   });
 
   // initial load
