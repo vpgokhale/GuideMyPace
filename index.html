@@ -3510,7 +3510,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         const edge = it.x + (it.width || 0);
         if (right === null || edge > right) right = edge;
       });
-      return { text: text.replace(/[ \t]+/g, ' ').trim(), y: cl.y, right: right };
+      // `items` keeps each item's own x/width (pre-join) alongside the flattened `text` — nothing
+      // that only reads {text, y, right} is affected, but examFindTableLineRuns (table detection,
+      // see below) needs the per-item x-positions back to tell column gaps from word spacing,
+      // which the flattened string alone has already thrown away.
+      return { text: text.replace(/[ \t]+/g, ' ').trim(), y: cl.y, right: right, items: ordered };
     }).filter(function (l) { return l.text.length > 0; });
   }
 
@@ -3585,6 +3589,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examImageSentinelLine(idx) {
     return 'IMG:' + idx + '';
   }
+  // The same answer-choice marker shapes examSplitIntoQuestions itself looks for (its own
+  // letterRe/numberRe/bulletRe, scoped to that function) — shared here by both the table detector
+  // and the image-label-absorption logic below, each of which needs to recognize (and never
+  // swallow) a line that could be an answer choice, like "A. 400" or "C. 0 N; balanced".
+  const EXAM_OPTION_MARKER_LINE_RE = /^\s*\(?([A-Za-z]|\d{1,2})[.):]\s+\S|^\s*([•●▪‣◦▶►○■□→✓✔☐❑♦∙*–—-])\s+\S/;
   function examIsImageSentinelLine(text) {
     return EXAM_IMG_SENTINEL_RE.test((text || '').trim());
   }
@@ -3775,6 +3784,102 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     return (nonBackground * sampleStep) >= EXAM_IMAGE_MIN_CONTENT_PIXELS;
   }
 
+  // A text label drawn directly on top of a pure vector diagram (no embedded raster/vector picture
+  // object at all — just lines/shapes with real PDF text written beside them, e.g. "box" / "6 N" /
+  // "14 N" labeling a force-arrow drawing) is still a genuine text line, so it interrupts what
+  // should be one large blank-space picture gap into two or more smaller ones — each of which can
+  // individually fall under the gap threshold below even though the full combined span clears it
+  // easily (this is the exact shape of the "diagram with force-arrow labels" case this was written
+  // for). A label line is recognized by elimination: it has to be short, it can't be an answer
+  // choice (EXAM_OPTION_MARKER_LINE_RE — a lettered/bulleted option is never part of a picture), and
+  // it can't read like an ordinary sentence or clause (no sentence-ending punctuation) — real body
+  // text pulled into a question stem or passage is never this terse.
+  // This heuristic is intentionally narrow — real worksheets are full of OTHER short lines that are
+  // never part of a picture (a letter's dateline "June 18, 2004", a greeting "Dear Anicka," a short
+  // title) and must never be swallowed into one. Two of those are excluded by name rather than left
+  // to the generic length/punctuation checks below, which is a near miss for the fixed-line-height
+  // test suite's own letter-editing worksheet: a greeting is already recognized elsewhere
+  // (examIsGreetingLine) as real paragraph structure in its own right, and a comma is something an
+  // actual diagram label (a bare word, a value-plus-unit) essentially never contains but an ordinary
+  // date or list fragment does.
+  const EXAM_IMAGE_LABEL_MAX_CHARS = 30;
+  const EXAM_IMAGE_LABEL_MAX_WORDS = 6;
+  function examIsImageLabelLine(text) {
+    const t = (text || '').trim();
+    if (!t) return false;
+    if (examIsImageSentinelLine(t)) return false;
+    if (EXAM_OPTION_MARKER_LINE_RE.test(t)) return false;
+    if (examIsGreetingLine(t)) return false; // real paragraph structure (a salutation), never a diagram label
+    if (t.indexOf(',') !== -1) return false; // a comma marks ordinary prose (a date, a list) — not how a bare label reads
+    if (t.length > EXAM_IMAGE_LABEL_MAX_CHARS) return false;
+    if (t.split(/\s+/).filter(Boolean).length > EXAM_IMAGE_LABEL_MAX_WORDS) return false;
+    if (/[.?!:;]\s*$/.test(t)) return false; // ends like a sentence/clause, not a bare label
+    return true;
+  }
+
+  // Starting from lines[topIdx] (the line immediately BEFORE a gap that, on its own, fell short of
+  // `threshold`), tries absorbing one or more consecutive label-like lines (examIsImageLabelLine)
+  // right after it into that same gap: if every line immediately following topIdx is label-like and
+  // the TOTAL span from lines[topIdx].y down to the first non-label line's y clears `threshold`,
+  // that non-label line's index is returned as the gap's real bottom boundary — the caller treats
+  // everything from topIdx+1 up to (but not including) that index as absorbed label lines to be
+  // collapsed into one inserted sentinel, right alongside the picture they're labeling. Returns null
+  // if there's no label line right after topIdx at all, the page runs out before hitting a solid
+  // line again, or the combined span still doesn't clear the threshold.
+  function examFindAbsorbableLabelSpan(lines, topIdx, threshold) {
+    const topY = lines[topIdx].y;
+    if (topY == null) return null;
+    let k = topIdx + 1;
+    while (k < lines.length && examIsImageLabelLine(lines[k].text)) k++;
+    if (k === topIdx + 1 || k >= lines.length) return null;
+    const bottomY = lines[k].y;
+    if (bottomY == null) return null;
+    return (topY - bottomY) >= threshold ? k : null;
+  }
+
+  // A line chart/bar graph's axis furniture (a title, the tick VALUES running up the Y axis, the
+  // axis UNIT labels, a row of tick values running along the X axis) is a materially different shape
+  // of problem from a diagram's scattered labels above: rather than one true picture gap getting
+  // interrupted once or twice, the chart's plotted line/bars/gridlines sit BEHIND a whole column of
+  // short text sitting at perfectly ordinary, uniform line-to-line spacing the entire way down (a
+  // graph's y-axis numbers are typeset like any other stack of short lines) — there is no elevated
+  // gap anywhere in that region for examFindAbsorbableLabelSpan to seed from at all. What stands out
+  // instead is the RUN itself: real worksheet prose essentially never produces many consecutive
+  // short, number-heavy lines in a row the way a graph's axis furniture does, so that run is detected
+  // structurally (a minimum run length, with at least a couple of bare numbers to confirm it's
+  // actually tick values and not, say, a run of short vocabulary terms) rather than geometrically.
+  const EXAM_CHART_BARE_NUMBER_RE = /^-?\d+(\.\d+)?%?$/;
+  const EXAM_CHART_TICK_ROW_RE = /^-?\d+(\.\d+)?(\s+-?\d+(\.\d+)?){1,}$/; // a whole row of tick values on one line, e.g. "0 1 2 3 4 5 6"
+  function examIsChartAxisLine(text) {
+    const t = (text || '').trim();
+    if (!t) return false;
+    if (examIsImageSentinelLine(t)) return false;
+    if (EXAM_OPTION_MARKER_LINE_RE.test(t)) return false;
+    if (EXAM_CHART_BARE_NUMBER_RE.test(t) || EXAM_CHART_TICK_ROW_RE.test(t)) return true;
+    return examIsImageLabelLine(t); // covers the chart's own title and axis unit labels ("Distance (meters)")
+  }
+  const EXAM_CHART_RUN_MIN_LINES = 4;
+  const EXAM_CHART_RUN_MIN_NUMBERS = 2;
+  const EXAM_CHART_RUN_MIN_SPAN_POINTS = 60;
+  // Starting at `startIdx` (already known to be chart-axis-like), extends through every consecutive
+  // chart-axis-like line and returns the index of the first line after the run — the run's real
+  // bottom boundary — but only once it's long enough, and numeric enough, to be confident this is
+  // really a graph's axis furniture and not a short coincidental run of ordinary text. Returns null
+  // if the run is too short, has too few actual numbers in it, or runs off the end of the page
+  // without a solid line to anchor the bottom boundary against.
+  function examFindChartAxisRunBounds(lines, startIdx) {
+    let k = startIdx;
+    let numberCount = 0;
+    while (k < lines.length && examIsChartAxisLine(lines[k].text)) {
+      if (EXAM_CHART_BARE_NUMBER_RE.test(lines[k].text.trim())) numberCount++;
+      k++;
+    }
+    if ((k - startIdx) < EXAM_CHART_RUN_MIN_LINES) return null;
+    if (numberCount < EXAM_CHART_RUN_MIN_NUMBERS) return null;
+    if (k >= lines.length) return null; // no real line left after the run to anchor the crop's bottom edge
+    return k;
+  }
+
   async function examDetectAndInsertPageImages(lines, page, imagesOut) {
     if (!lines || lines.length < 2) return lines;
     const gaps = [];
@@ -3788,13 +3893,62 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const median = sortedGaps.length % 2 ? sortedGaps[mid] : (sortedGaps[mid - 1] + sortedGaps[mid]) / 2;
     const threshold = Math.max(EXAM_IMAGE_GAP_MIN_POINTS, median > 0 ? median * EXAM_IMAGE_GAP_MEDIAN_MULTIPLIER : EXAM_IMAGE_GAP_MIN_POINTS);
 
-    const candidateIdxs = [];
-    for (let i = 1; i < lines.length; i++) {
+    // Each candidate is a {top, bottom} index pair into `lines`: the ordinary case is a single gap
+    // (bottom = top+1, nothing to absorb), and the label-absorption case spans one or more label
+    // lines in between (bottom = top+1+k). Built with a while loop (rather than a plain for) so that
+    // once a span absorbs some lines, the scan can jump straight past them instead of re-examining
+    // (and potentially re-matching) lines already claimed by that span.
+    const candidateSpans = [];
+    let i = 1;
+    while (i < lines.length) {
       const a = lines[i - 1].y, b = lines[i].y;
-      if (a == null || b == null) continue;
-      if ((a - b) >= threshold) candidateIdxs.push(i);
+      if (a == null || b == null) { i++; continue; }
+      // A gap sitting right next to an already-inserted sentinel (examDetectAndInsertPageTables
+      // runs first and may have collapsed a whole table's worth of lines down to one sentinel
+      // placed at their midpoint) is NOT a second picture — it's just the ordinary text-flow
+      // distance either side of a visual that's already been extracted. The real page pixels in
+      // that stretch still contain that same table, so without this check this pass would crop
+      // and extract it a second (and third) time, right alongside its own sentinel. Skip any gap
+      // touching a sentinel line entirely; it was already accounted for.
+      if (examIsImageSentinelLine(lines[i - 1].text) || examIsImageSentinelLine(lines[i].text)) { i++; continue; }
+      // A chart's axis furniture (title, tick values, axis unit labels) is checked before anything
+      // gap-based — see examFindChartAxisRunBounds's own comment — since there's typically no
+      // elevated gap anywhere in that region for the checks below to even notice.
+      if (examIsChartAxisLine(lines[i].text)) {
+        const runEnd = examFindChartAxisRunBounds(lines, i);
+        if (runEnd != null && (lines[i - 1].y - lines[runEnd].y) >= EXAM_CHART_RUN_MIN_SPAN_POINTS) {
+          candidateSpans.push({ top: i - 1, bottom: runEnd });
+          i = runEnd + 1;
+          continue;
+        }
+      }
+      // When the very next line looks like an on-diagram label, absorption is tried FIRST, even if
+      // the immediate sub-gap already clears the threshold on its own — a label sitting partway
+      // down a picture (e.g. "6 N" written beside a force arrow) splits one true gap into two, and
+      // the first of those two sub-gaps can easily clear the threshold by itself while still only
+      // covering the blank space ABOVE the label, well short of the real picture that continues
+      // below it. Stopping at that first sub-gap would crop just that empty sliver and miss the
+      // diagram entirely, so a label right after topIdx always gets a chance to extend the span
+      // past it before any plain single-gap candidate is accepted. Gated on the gap already being
+      // at least somewhat elevated (half the absolute image-gap floor) so ordinary, tightly-packed
+      // body text — where every line sits the normal line-height apart, nowhere near paragraph-break
+      // size — is never even considered a candidate in the first place.
+      if ((a - b) >= EXAM_IMAGE_GAP_MIN_POINTS / 2 && examIsImageLabelLine(lines[i].text)) {
+        const absorbedBottom = examFindAbsorbableLabelSpan(lines, i - 1, threshold);
+        if (absorbedBottom != null) {
+          candidateSpans.push({ top: i - 1, bottom: absorbedBottom });
+          i = absorbedBottom + 1; // skip past the lines just absorbed so they aren't reconsidered
+          continue;
+        }
+      }
+      if ((a - b) >= threshold) {
+        candidateSpans.push({ top: i - 1, bottom: i });
+        i++;
+        continue;
+      }
+      i++;
     }
-    if (!candidateIdxs.length) return lines;
+    if (!candidateSpans.length) return lines;
 
     // Only now — once we know at least one candidate gap exists — is the page actually rendered to
     // a canvas; most pages (plain text, no embedded visuals) never pay this cost at all.
@@ -3805,10 +3959,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     await page.render({ canvasContext: fullCanvas.getContext('2d'), viewport }).promise;
 
     const result = lines.slice();
-    let offset = 0; // each inserted sentinel shifts every later candidate's index in `result` by one
-    for (const origIdx of candidateIdxs) {
-      const i = origIdx + offset;
-      const topLine = result[i - 1], bottomLine = result[i];
+    let offset = 0; // each inserted sentinel shifts every later span's indices in `result`
+    for (const span of candidateSpans) {
+      const topIdx = span.top + offset, bottomIdx = span.bottom + offset;
+      const topLine = result[topIdx], bottomLine = result[bottomIdx];
       // pdf.js reports each line's y as its text BASELINE, not its visual top/bottom — real glyphs
       // extend well above that baseline (a cap-height/ascent commonly 70-85% of the font size) and
       // only a little below it (a descender, commonly 15-25%). Clearing the PRECEDING line only
@@ -3838,8 +3992,208 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
       const idx = imagesOut.length;
       imagesOut.push({ data: cropCanvas.toDataURL('image/png'), w: cropCanvas.width, h: cropCanvas.height });
-      result.splice(i, 0, { text: examImageSentinelLine(idx), y: (topLine.y + bottomLine.y) / 2, right: 0 });
-      offset++;
+      // 0 for the ordinary single-gap case; for an absorbed span, every label line strictly between
+      // top and bottom gets removed and replaced by this one sentinel, right along with the picture
+      // it was labeling.
+      const removedCount = bottomIdx - topIdx - 1;
+      result.splice(topIdx + 1, removedCount, { text: examImageSentinelLine(idx), y: (topLine.y + bottomLine.y) / 2, right: 0 });
+      offset += 1 - removedCount;
+    }
+    return result;
+  }
+
+  // ---- Table detection ---------------------------------------------------------------------
+  // A table built from real, selectable PDF text (rather than an embedded picture) never shows up
+  // as a gap in the line-stream the way examDetectAndInsertPageImages looks for — its rows sit at
+  // perfectly ordinary line-to-line spacing, just like any other paragraph, so nothing about their
+  // Y position stands out. What DOES stand out is the horizontal layout WITHIN each row: a run of
+  // several consecutive lines that each split into the same number (2+) of widely-separated,
+  // column-aligned chunks of text is a table row wherever it appears in the document, whatever
+  // that document happens to be about.
+  //
+  // Rather than reconstruct the grid from scratch in HTML (and risk getting a merged cell, a
+  // decimal, or a header wrong), a detected run is rasterized and spliced back into the
+  // line-stream as an ordinary IMG: sentinel (EXAM_IMG_SENTINEL_RE) — sharing the exact same
+  // picture/table/chart pipeline the rest of the file already has end to end (per-question
+  // attachment, on-screen rendering, PDF export). That also happens to be exactly what a
+  // worksheet author would expect: the table shows up looking exactly like the original, gridlines
+  // and all, the same way a photo or chart on the page would.
+  //
+  // A gap below this (in points) is ordinary within-cell word spacing and gets merged into the
+  // same cell; at or above it, it's treated as a column boundary. Worksheet body text commonly
+  // runs 10-14pt, where normal word spacing is only a few points — a deliberately laid-out table
+  // column gap is comfortably larger than that in virtually every real document.
+  const EXAM_TABLE_CELL_GAP_MIN_POINTS = 10;
+  // How far a column's position may drift between rows and still count as "the same column" —
+  // checked against EVERY left edge and EVERY inter-cell boundary as its own independent signal
+  // (see examFindTableLineRuns), because no single geometric choice holds for every column of
+  // every real table. A header like "Time (seconds)" is routinely much wider than the short
+  // numeric values sitting in the same column underneath it, so depending on how the table was
+  // generated, EITHER the header's own left edge can legitimately sit 30-50pt+ away from every
+  // data row's (when columns are centered — the header overhangs evenly on both sides) OR the
+  // midpoint of the gap between it and its neighboring cell can (when columns are left-aligned
+  // instead — the header only overhangs to the right, so the gap shrinks instead of staying put).
+  // A free-text column (a worksheet's "Observation" column, say, holding a different full sentence
+  // per row) is worse still: its own width swings so much row to row that NEITHER its left edge
+  // nor its boundary with a neighbor ever lines up with anything, including its own header's —
+  // there is simply no stable position to check for a column like that. What stays reliable is
+  // that a real table almost always has at least one OTHER column (a label, an index, a short
+  // fixed value) that stays visually anchored the whole way down, so a row is accepted as long as
+  // at least one signal — any column's left edge, or any boundary between two neighboring columns
+  // — stays within this tolerance of where that same signal has been for the run so far. One
+  // tolerance serves all of them since real-world drift on a genuinely stable signal measured only
+  // a few points to a few dozen wide in practice, comfortably inside it, while staying nowhere near
+  // wide enough to blur two genuinely different columns together (actual column gaps run well over
+  // 100pt in practice).
+  const EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS = 30;
+  const EXAM_TABLE_MIN_ROWS = 3;
+  const EXAM_TABLE_MIN_COLS = 2;
+  // A short option list like "A. 400" / "B. 450" / "C. 300" can otherwise look exactly like a
+  // narrow two-column table to the detector below, so any line that could be an answer choice
+  // (EXAM_OPTION_MARKER_LINE_RE, shared with the image-label-absorption logic above) is never
+  // considered a table row, full stop.
+
+  // Groups one line's raw left-to-right items into "cells" — merging any pair whose gap is under
+  // EXAM_TABLE_CELL_GAP_MIN_POINTS (ordinary word spacing inside the same cell) and starting a new
+  // cell at any gap at or above it (a column boundary). Returns each resulting cell's left AND
+  // right edge (not just its start) — examLineToCellBoundaries needs both to find the midpoint
+  // between one cell's end and the next cell's start, which is what the run-finder below actually
+  // aligns rows on (see EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS' own comment for why).
+  function examLineToCells(line) {
+    const items = (line.items || []).filter(function (it) { return it.str && it.str.trim(); });
+    if (!items.length) return [];
+    const cells = [{ x: items[0].x, right: items[0].x + (items[0].width || 0) }];
+    for (let i = 1; i < items.length; i++) {
+      const it = items[i];
+      const last = cells[cells.length - 1];
+      if ((it.x - last.right) >= EXAM_TABLE_CELL_GAP_MIN_POINTS) {
+        cells.push({ x: it.x, right: it.x + (it.width || 0) });
+      } else {
+        last.right = Math.max(last.right, it.x + (it.width || 0));
+      }
+    }
+    return cells;
+  }
+
+  // Thin convenience wrapper — just the x-start of each cell examLineToCells found, with none of
+  // the right-edge/boundary detail. Used wherever only the cell COUNT or a rough position matters.
+  function examLineToCellStarts(line) {
+    return examLineToCells(line).map(function (c) { return c.x; });
+  }
+
+  // The actual per-row "column signature" examFindTableLineRuns aligns across rows: for N cells,
+  // the N-1 midpoints of the gaps BETWEEN them (never each cell's own edge — see
+  // EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS' comment for why that's the more stable choice).
+  function examLineToCellBoundaries(cells) {
+    const bounds = [];
+    for (let i = 1; i < cells.length; i++) bounds.push((cells[i - 1].right + cells[i].x) / 2);
+    return bounds;
+  }
+
+  // One row's full "column signature": every cell's own left edge, followed by every boundary
+  // between two neighboring cells — examFindTableLineRuns tracks each of these independently and
+  // only needs ONE of them to stay put for a row to join the run (see
+  // EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS' own comment for why requiring every one of them to
+  // agree, or even requiring a single consistent method across all of them, isn't safe to assume
+  // of a real table). Two rows must already have gone through the same examLineToCells() cell
+  // count for their signatures to line up index-for-index, which the caller checks before calling
+  // this.
+  function examRowSignals(cells) {
+    return cells.map(function (c) { return c.x; }).concat(examLineToCellBoundaries(cells));
+  }
+
+  // Scans `lines` for maximal runs of EXAM_TABLE_MIN_ROWS+ consecutive lines that all split into
+  // the same number (EXAM_TABLE_MIN_COLS+) of cells, where at least one column signal (see
+  // examRowSignals) stays within EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS of itself across the whole
+  // run. Returns [{start, end}] index ranges (inclusive, into `lines`), earliest first, never
+  // overlapping.
+  function examFindTableLineRuns(lines) {
+    const runs = [];
+    let i = 0;
+    while (i < lines.length) {
+      if (EXAM_OPTION_MARKER_LINE_RE.test(lines[i].text) || examIsImageSentinelLine(lines[i].text)) { i++; continue; }
+      const cells0 = examLineToCells(lines[i]);
+      if (cells0.length < EXAM_TABLE_MIN_COLS) { i++; continue; }
+      const sig0 = examRowSignals(cells0);
+      let j = i + 1;
+      const sigMin = sig0.slice(), sigMax = sig0.slice();
+      while (j < lines.length) {
+        if (EXAM_OPTION_MARKER_LINE_RE.test(lines[j].text) || examIsImageSentinelLine(lines[j].text)) break;
+        const cells = examLineToCells(lines[j]);
+        if (cells.length !== cells0.length) break;
+        const sig = examRowSignals(cells);
+
+        let anyAligned = false;
+        for (let c = 0; c < sig.length; c++) {
+          const lo = Math.min(sigMin[c], sig[c]), hi = Math.max(sigMax[c], sig[c]);
+          if (hi - lo <= EXAM_TABLE_COL_ALIGN_TOLERANCE_POINTS) { anyAligned = true; break; }
+        }
+        if (!anyAligned) break;
+
+        for (let c = 0; c < sig.length; c++) {
+          sigMin[c] = Math.min(sigMin[c], sig[c]);
+          sigMax[c] = Math.max(sigMax[c], sig[c]);
+        }
+        j++;
+      }
+      if (j - i >= EXAM_TABLE_MIN_ROWS) {
+        runs.push({ start: i, end: j - 1 });
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    return runs;
+  }
+
+  // Rasterizes each detected table run (see examFindTableLineRuns) out of the page and splices an
+  // IMG: sentinel into `lines` in its place, consuming the run's original text lines entirely —
+  // mirrors examDetectAndInsertPageImages's own render/crop/sentinel steps, reusing the same
+  // `imagesOut` array (a rendered table is indistinguishable, downstream, from any other detected
+  // picture) and the same EXAM_IMAGE_RENDER_SCALE/EXAM_IMAGE_MIN_CROP_HEIGHT_PX/examCanvasHasContent
+  // the image detector already uses, so the two stay visually and behaviorally consistent.
+  async function examDetectAndInsertPageTables(lines, page, imagesOut) {
+    if (!lines || lines.length < EXAM_TABLE_MIN_ROWS) return lines;
+    const runs = examFindTableLineRuns(lines);
+    if (!runs.length) return lines;
+
+    const viewport = page.getViewport({ scale: EXAM_IMAGE_RENDER_SCALE });
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = viewport.width;
+    fullCanvas.height = viewport.height;
+    await page.render({ canvasContext: fullCanvas.getContext('2d'), viewport }).promise;
+
+    const result = lines.slice();
+    let offset = 0; // each run collapses (len-1) lines down to 1 sentinel, shifting every later run's indices
+    for (const run of runs) {
+      const start = run.start + offset, end = run.end + offset;
+      const topLine = result[start], bottomLine = result[end];
+      // Small, roughly symmetric padding is enough here (unlike the image detector's asymmetric
+      // top/bottom padding) — both edges of a table run are real text baselines with ordinary
+      // ascent/descent, not an unknown blank gap that might start partway through a neighboring
+      // line's glyphs.
+      const topPdfY = topLine.y + 10;
+      const bottomPdfY = bottomLine.y - 6;
+      const p1 = viewport.convertToViewportPoint(0, topPdfY);
+      const p2 = viewport.convertToViewportPoint(0, bottomPdfY);
+      const cropTop = Math.max(0, Math.round(Math.min(p1[1], p2[1])));
+      const cropBottom = Math.min(fullCanvas.height, Math.round(Math.max(p1[1], p2[1])));
+      const cropHeight = cropBottom - cropTop;
+      if (cropHeight < EXAM_IMAGE_MIN_CROP_HEIGHT_PX) continue;
+
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = fullCanvas.width;
+      cropCanvas.height = cropHeight;
+      const cropCtx = cropCanvas.getContext('2d');
+      cropCtx.drawImage(fullCanvas, 0, cropTop, fullCanvas.width, cropHeight, 0, 0, fullCanvas.width, cropHeight);
+
+      if (!examCanvasHasContent(cropCtx, cropCanvas.width, cropCanvas.height)) continue;
+
+      const idx = imagesOut.length;
+      imagesOut.push({ data: cropCanvas.toDataURL('image/png'), w: cropCanvas.width, h: cropCanvas.height });
+      const removed = end - start + 1;
+      result.splice(start, removed, { text: examImageSentinelLine(idx), y: (topLine.y + bottomLine.y) / 2, right: 0 });
+      offset -= (removed - 1);
     }
     return result;
   }
@@ -3870,7 +4224,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
       const rawLines = examItemsToLines(textContent.items);
-      const linesWithImages = await examDetectAndInsertPageImages(rawLines, page, extractedImages);
+      const linesWithTables = await examDetectAndInsertPageTables(rawLines, page, extractedImages);
+      const linesWithImages = await examDetectAndInsertPageImages(linesWithTables, page, extractedImages);
       const pageText = examJoinLinesWithParagraphGaps(examMergeStrayMarkerLines(linesWithImages)).trim();
       if (pageText.length >= 15) anySubstantialText = true;
       pages.push({ pageNum, page, itemCount: textContent.items.length, pageText });
@@ -4856,17 +5211,17 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const set = new Set();
     (notesText || '').split(/\s+/).forEach(function (t) {
       const n = examKeywordKey(t);
-      // Only the two actual stray-filler WORDS — "a" and "i" (the indefinite article and the
-      // pronoun, typed in either case) — are too noisy to flag everywhere they appear, so those stay
-      // excluded. Every other single letter ("C", "D", "c", "d", "b", "x", ...) is commonly a
-      // deliberate point/segment/variable label (e.g. geometry worksheets: "From C - D", or typed in
-      // notes as lowercase "c d" relying on case-insensitive matching to find "C"/"D" in an answer
-      // choice — see examKeywordMatches), not noise, so it's kept. This check is deliberately
-      // case-insensitive regardless of the "Notes Case Sensitive" checkbox — whether "a"/"i" is
-      // noise doesn't depend on how it was capitalized, only on what word it is. A single DIGIT
-      // ("5") or a single SYMBOL ("/") is exact, meaningful content on its own too, so both are also
-      // kept even at length 1.
-      if (n && (n.length > 1 || !/^[ai]$/i.test(n))) set.add(n);
+      // Every non-empty token is kept, including single letters/digits/symbols — there is no
+      // length-1 exclusion here (an earlier version tried to filter out "a"/"i" as noisy filler
+      // words, but that's genuinely ambiguous: on worksheets like this user's (geometry/graph
+      // labels — "From A - B", "e f") a bare "A" or "I" is just as likely to be a deliberate
+      // point/segment label as it is to be the article/pronoun, and there's no way to tell the two
+      // apart from the token alone. Silently dropping one of those readings produced three separate
+      // "why didn't X underline" reports in a row (first "C - D", then lowercase "c d", then "A" in
+      // "A B" right alongside a "B" that worked) — so the filter is gone. Whatever is typed in
+      // Notes is now exactly what can underline, with no exceptions; see examKeywordMatches for the
+      // one knob that still exists (the "Notes Case Sensitive" checkbox).
+      if (n) set.add(n);
     });
     return set;
   }
