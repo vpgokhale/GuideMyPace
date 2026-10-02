@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Q-Along — Prototype</title>
+<title>Guide My Pace — Prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@400;600&display=swap" rel="stylesheet">
@@ -42,6 +42,8 @@
     --echoed-ink: #ffffff;
     --danger: #dc2626;
     --mask-color: #9ca3af;
+    --exam-mask-color: #9ca3af; /* independent of Read mode's --mask-color, so the passage's own
+                                    cover-color picker (Exam mode) never changes Read mode's */
     --reading-font: 'Atkinson Hyperlegible', Verdana, Arial, sans-serif;
     --letter-spacing: 0.06em;
     --word-spacing: 0.3em;
@@ -98,6 +100,8 @@
     font-weight: 700;
   }
   .exam-question-area { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #fbfbfe; }
+  .exam-question-images { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  .exam-question-image { max-width: 100%; max-height: 420px; width: auto; height: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; align-self: flex-start; }
 
   .exam-option-editor-row { display: flex; gap: 8px; align-items: flex-start; margin-top: 8px; }
   .exam-option-editor-row textarea { flex: 1; min-height: 44px; }
@@ -113,7 +117,7 @@
     border-radius: 10px;
     transition: border-color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
   }
-  .exam-option-row input[type="radio"] { margin-top: 3px; }
+  .exam-option-row input[type="radio"], .exam-option-row input[type="checkbox"] { margin-top: 3px; }
   /* .exam-option-text also carries the .reading-area class (added in JS) so it picks up exactly
      the same font, size, letter/word-spacing and line-height the Typography controls apply to
      the question — this padding override just keeps that class's block padding from adding
@@ -148,6 +152,22 @@
     box-shadow: 0 0 0 0 rgba(239,68,68,0.6);
     animation: pulse 1.4s infinite;
   }
+  .exam-reset-btn {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 1.15rem;
+    line-height: 1;
+    background: white;
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+  .exam-reset-btn:hover:not(:disabled) { background: #f2f3f8; }
   .exam-inline-row { display: flex; align-items: flex-start; gap: 10px; }
   .exam-inline-row .exam-question-area { flex: 1; }
 
@@ -197,6 +217,25 @@
     margin-top: 10px;
   }
   .text-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .word-predict-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .word-predict-chip {
+    background: #fbfbfe;
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .word-predict-chip:hover { background: #eef0fd; border-color: var(--accent); }
+
   label.field-label {
     display: block;
     font-size: 0.8rem;
@@ -280,6 +319,13 @@
   .reading-area p.para-block:last-child {
     margin-bottom: 0;
   }
+  /* A short, deliberate line (a dateline, a greeting, a quoted line inside a question) that
+     shouldn't get a full paragraph's worth of space before what follows it — see
+     examSplitParagraphsWithTightness. Sits as close to the next line as ordinary line-height,
+     same as if it had simply wrapped within one paragraph. */
+  .reading-area p.para-block.tight {
+    margin-bottom: 0;
+  }
   .word {
     display: inline-block;
     padding: 2px 4px;
@@ -295,6 +341,75 @@
   .word.corrected { background: var(--corrected-bg); color: var(--corrected-ink); }
   .word.helped { background: var(--helped-bg); color: var(--helped-ink); }
   .word.echoed { background: var(--echoed-bg); color: var(--echoed-ink); }
+
+  /* Exam mode's own, more transparent take on the five status colors above — scoped to Exam
+     mode's three reading areas only (the passage, the question stem, each answer option) via
+     selector specificity, so Read mode's own identical-looking .word.correct/.incorrect/etc.
+     keep their original solid-background-plus-white-text look completely untouched. The shared
+     rules above pair a saturated background with white text for contrast; these instead use a
+     light tint of the same color, so the reading area's normal black text stays legible without
+     switching to white. (--skipped-bg/.word.current-target/.word.attempting already pair a light
+     background with dark text and don't need this treatment.) */
+  #examPassageArea .word.correct, #examQuestionArea .word.correct, .exam-option-row .word.correct {
+    background: rgba(22, 163, 74, 0.22); color: var(--ink);
+  }
+  #examPassageArea .word.incorrect, #examQuestionArea .word.incorrect, .exam-option-row .word.incorrect {
+    background: rgba(220, 38, 38, 0.22); color: var(--ink);
+  }
+  #examPassageArea .word.corrected, #examQuestionArea .word.corrected, .exam-option-row .word.corrected {
+    background: rgba(13, 148, 136, 0.22); color: var(--ink);
+  }
+  #examPassageArea .word.helped, #examQuestionArea .word.helped, .exam-option-row .word.helped {
+    background: rgba(101, 163, 13, 0.25); color: var(--ink);
+  }
+  #examPassageArea .word.echoed, #examQuestionArea .word.echoed, .exam-option-row .word.echoed {
+    background: rgba(124, 58, 237, 0.2); color: var(--ink);
+  }
+  /* The Exam mode legend (see examHighlightLegend) shows the same translucent colors as the
+     reading areas above it, rather than Read mode's original solid ones, so the key actually
+     matches what the reader sees. Read mode's own, separate legend is untouched. */
+  #examHighlightLegend .swatch.correct { background: rgba(22, 163, 74, 0.35); border: 1px solid rgba(22, 163, 74, 0.6); }
+  #examHighlightLegend .swatch.incorrect { background: rgba(220, 38, 38, 0.35); border: 1px solid rgba(220, 38, 38, 0.6); }
+
+  /* Text Match mode (examTextMatchToggle/examRefreshTextMatches): a purple highlight on any
+     passage word that's part of an exact phrase the active question also contains. A purple
+     outline persists on a matched word no matter its reading status, so it stays identifiable
+     even once read/scored; the purple fill only shows while the word is still unread (status
+     'pending'), since once it has a real status that status's own color takes over as the more
+     useful signal. New, exam-only class — Read mode never sets it, so this is safe unscoped. */
+  .word.text-match { outline: 2px solid rgba(147, 51, 234, 0.8); outline-offset: 1px; }
+  .word.pending.text-match { background: rgba(147, 51, 234, 0.16); }
+  #examHighlightLegend .swatch.text-match-swatch { background: rgba(147, 51, 234, 0.16); outline: 2px solid rgba(147, 51, 234, 0.8); outline-offset: 1px; }
+  /* Mark Up mode (examMarkupToggle/examMarkupEdits/examParseOptionEdit) — its OWN separate toggle,
+     independent of Text Match above: once the reader selects an answer shaped like "before →
+     after", the passage word(s) it targets show the "after" text in place of the original, with a
+     wavy underline marking it as a proposed edit, not the document's real text. Deliberately NO
+     outline AND no background fill here, unlike Text Match above (which keeps both) — a persisted
+     edit from a DIFFERENT question (see examMarkupEdits below) sitting next to an active question's
+     real Text Match highlight made the edited word look like it was ALSO part of that Text Match
+     hit, when it isn't; the plain underline alone is distinct enough on its own. Reverts the
+     moment that question's answer changes or Mark Up is turned off — examRenderPassageWords always
+     redraws every word's text from scratch, never just the ones currently edited — but, unlike
+     Text Match, deliberately persists across question navigation: an edit recorded on one question
+     keeps showing while viewing another (see examMarkupEdits, keyed by every question that has
+     one, not just the active one). Mark Up still quietly reuses Text Match's own phrase-matching
+     (examFindTextMatches) under the hood to pick the right occurrence of a repeated word, but that
+     internal lookup runs regardless of whether Text Match's own highlight toggle is on — the two
+     toggles only share logic, not visibility. */
+  .word.markup-edit {
+    text-decoration: underline wavy rgba(147, 51, 234, 0.9);
+    text-decoration-thickness: 2px;
+  }
+  /* The legend's own key for Mark Up is a plain colored line (not a box) to match — an empty
+     swatch element has no text of its own to underline, so a bottom border stands in for the
+     wavy underline the real passage words get. */
+  #examHighlightLegend .swatch.markup-edit-swatch {
+    background: transparent;
+    border-radius: 0;
+    height: 0;
+    border-bottom: 3px solid rgba(147, 51, 234, 0.9);
+    align-self: center;
+  }
   .word.current-target {
     background: #dbeafe;
     color: #1e3a8a;
@@ -330,7 +445,34 @@
     user-select: none;
   }
   .word.masked .attempt-badge { display: none; }
-  .word.keyword-match { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  /* Overrides the generic .word.masked rule above (higher specificity via the ID selector) so the
+     exam passage's own "Cover unread text" color is independent of Read mode's --mask-color and of
+     the exam answer-option masking's color (both of which keep using --mask-color, unchanged). */
+  #examPassageArea .word.masked {
+    background: var(--exam-mask-color);
+    color: transparent;
+    box-shadow: none;
+    animation: none;
+    text-decoration: none;
+    user-select: none;
+  }
+  /* Keyword Match: any answer-choice word that echoes something already in the reader's own notes
+     (examKeywordMatches) gets a blue underline — distinct from Text Match/Mark Up's purple above,
+     since this one is about the reader's OWN words, not the document's. Exam-only class (see
+     examRenderOptionsList), so — like .word.text-match above — safe to style unscoped. */
+  .word.keyword-match { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; text-decoration-color: #2563eb; }
+  /* .word.masked's own text-decoration:none (above) and this rule have EQUAL specificity (two
+     classes each) — without this override, source order alone decides, and this rule (appearing
+     later in the stylesheet) would win, bleeding the blue underline through the grey "not yet
+     played" cover. Three classes outweighs masked's two, so the cover always wins while it's up. */
+  .word.masked.keyword-match { text-decoration: none; }
+  #examHighlightLegend .swatch.keyword-match-swatch {
+    background: transparent;
+    border-radius: 0;
+    height: 0;
+    border-bottom: 3px solid #2563eb;
+    align-self: center;
+  }
 
   .cover-controls {
     display: flex;
@@ -630,7 +772,7 @@
 <body>
 <div class="wrap">
 
-  <h1>🎙️ Q-Along</h1>
+  <h1>🎙️ Guide My Pace</h1>
   <p class="subtitle" id="subtitleText"></p>
 
   <!-- Read mode is temporarily hidden (Exam mode only, for now) — to bring it back, remove the
@@ -866,6 +1008,87 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               </select>
             </span>
             <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Speaker mode will enable all text to be read aloud. When unchecked, the application will be listening for the reader's own speech. In either mode, the same flow applies — answer choices only unlock once the question has been processed, and each choice must be processed before a selection can be made.</div></details>
+            <!-- flex-basis:100% forces this onto its own line below Speaker mode/Speed regardless of
+                 viewport width, while staying inside the SAME .cover-controls block as Speaker mode
+                 (rather than a new sibling div) — a separate test (playwright_cover_test.js) asserts
+                 the Reader Mode cover block is Speaker mode's block's very next DOM sibling, so this
+                 avoids disturbing that adjacency rather than being a layout-only decision. -->
+            <label class="cover-toggle-label" style="flex-basis:100%">
+              <input type="checkbox" id="examNaturalLanguageToggle">
+              Natural Language
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Experimental. When checked, Speaker mode breaks what it reads into short phrases with a brief pause between each one, instead of one continuous sentence — closer to how a person naturally reads aloud. Off by default; only affects Speaker mode's own TTS playback.</div></details>
+          </div>
+
+          <!-- Passage-only "cover unread text" scaffolding, mirroring Read mode's own cover
+               feature (see coverToggle/revealWordsSelect/revealLinesSelect) but fully independent
+               of it — its own DOM refs, its own --exam-mask-color CSS variable, its own functions
+               (examComputePassageMask etc.) — so nothing here touches Read mode's code or
+               shared state. Applies in both Speaker and Read/listen mode. -->
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examPassageCoverToggle">
+              Cover unread text (passage)
+            </label>
+            <span class="color-field">
+              Block color:
+              <input type="color" id="examPassageMaskColorPicker" value="#9ca3af">
+            </span>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Blocks out the rest of the line and every line below it in the passage, so only what's already been read stays visible. Applies to the passage only, in both Speaker mode and Read/listen mode.</div></details>
+          </div>
+
+          <div class="cover-controls" id="examPassageRevealControls" hidden>
+            <span class="color-field">
+              Reader Mode Word Cover:
+              <select id="examPassageRevealWordsSelect">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </span>
+            <span class="color-field">
+              Reader Mode Line Cover:
+              <select id="examPassageRevealLinesSelect">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+            </span>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">How many words ahead on the current line, and how many lines below it, stay visible anyway. Raise these gradually to fade the cover back as the reader needs less support.</div></details>
+          </div>
+
+          <!-- Highlights any exact phrase the current question's stem shares with the passage, so
+               a reader can quickly spot the exact text a question is asking about (e.g. "Kamakura
+               japan" quoted in the question, found and highlighted where it appears in the
+               passage). Recomputed whenever the active question changes — see
+               examRefreshTextMatches. Independent of Mark Up below — either can be on without the
+               other. -->
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examTextMatchToggle">
+              Text Match
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">When checked, any exact phrase (two or more words) shared between the current question and the passage is highlighted in purple in the passage.</div></details>
+          </div>
+
+          <!-- Live-previews the selected answer IN the passage: once the reader picks an option
+               shaped like "before → after", the passage text it targets is overwritten with
+               "after", reverting the moment that question's answer changes or this is unchecked —
+               see examMarkupEdits. Persists across question navigation (an edit made on one
+               question stays visible while viewing another) and is its own toggle, independent of
+               Text Match above. -->
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examMarkupToggle">
+              Mark Up
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">When checked, if the selected answer proposes an edit ("before → after"), the passage text is overwritten live to preview it.</div></details>
           </div>
 
           <div class="cover-controls">
@@ -875,6 +1098,39 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
             </label>
             <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Off by default. When checked, pressing Submit also logs the session and automatically downloads a word-level CSV, in addition to the PDF. Leave unchecked for a plain PDF-only submission.</div></details>
           </div>
+
+          <label class="field-label">Highlight Color Key</label>
+          <div class="legend" id="examHighlightLegend">
+            <span><i class="swatch pending"></i> not yet read</span>
+            <span><i class="swatch" style="background:#dbeafe;box-shadow:0 0 0 1.5px var(--accent);"></i> active — waiting for speech</span>
+            <span><i class="swatch correct"></i> correct</span>
+            <span><i class="swatch" style="background:#65a30d"></i> correct with help</span>
+            <span><i class="swatch skipped"></i> skipped</span>
+            <span><i class="swatch incorrect"></i> incorrect</span>
+            <span><i class="swatch text-match-swatch"></i> Text Match (shared with question)</span>
+            <span><i class="swatch markup-edit-swatch"></i> Mark Up — selected answer's edit preview</span>
+            <span><i class="swatch keyword-match-swatch"></i> Keyword Match — answer choice echoes your notes</span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Its own section, matching the Load card's pattern exactly — only shown when the loaded
+         document had a detected reading passage ahead of its questions (see
+         examExtractPassageAndBody). Stays visible across every stage (edit-and-fix, and each
+         question in the work card) rather than being tied to any one question, since it's the same
+         shared passage for all of them. Playable exactly like a question stem: Speaker/Read mode
+         both apply, via the same shared reading engine (see examPassagePlayBtn's click handler). -->
+    <div class="card" id="examPassageCard" hidden>
+      <details class="card-toggle" id="examPassageDetails" open>
+        <summary class="card-toggle-summary"><h2>📖 Passage</h2></summary>
+        <div class="card-toggle-body">
+          <div class="exam-inline-row">
+            <button type="button" class="exam-play-btn" id="examPassagePlayBtn" aria-label="Play — read the passage aloud" title="Play — read the passage aloud"><span id="examPassagePlayIcon">▶</span></button>
+            <button type="button" class="exam-reset-btn" id="examPassageResetBtn" aria-label="Reset — clear highlights and start the passage over" title="Reset — clear highlights and start the passage over">↺</button>
+            <div class="reading-area" id="examPassageArea"></div>
+          </div>
+          <div class="status-line" id="examPassageStatus"></div>
         </div>
       </details>
     </div>
@@ -907,20 +1163,20 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         <button type="button" class="exam-play-btn" id="examQuestionPlayBtn" aria-label="Play — read the question aloud" title="Play — read the question aloud"><span id="examQuestionPlayIcon">▶</span></button>
         <div class="reading-area exam-question-area" id="examQuestionArea"></div>
       </div>
+      <div id="examQuestionImages" class="exam-question-images" hidden></div>
       <div class="status-line" id="examQuestionStatus"></div>
-
-      <div class="legend">
-        <span><i class="swatch pending"></i> not yet read</span>
-        <span><i class="swatch" style="background:#dbeafe;box-shadow:0 0 0 1.5px var(--accent);"></i> active — waiting for speech</span>
-        <span><i class="swatch correct"></i> correct</span>
-        <span><i class="swatch" style="background:#65a30d"></i> correct with help</span>
-        <span><i class="swatch skipped"></i> skipped</span>
-        <span><i class="swatch incorrect"></i> incorrect</span>
-      </div>
 
       <div id="examNotesBlock" hidden>
         <label class="field-label" for="examNotesInput">Notes — jot down your thinking</label>
         <textarea id="examNotesInput" class="text-input" style="min-height:70px"></textarea>
+        <div class="word-predict-bar" id="examWordPredictBar" hidden></div>
+        <div class="cover-controls" style="margin-top:4px">
+          <label class="cover-toggle-label">
+            <input type="checkbox" id="examNotesCaseSensitiveToggle">
+            Notes Case Sensitive
+          </label>
+          <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Controls Keyword Match (the blue underline on an answer choice that echoes your notes). Unchecked (default): "c" in your notes also matches "C" in an answer choice. Check this to require the exact same case.</div></details>
+        </div>
         <div class="row">
           <button class="btn-primary" id="examReadyBtn" disabled>Show options</button>
         </div>
@@ -937,6 +1193,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
       <div id="examSubmitBlock" hidden>
         <div class="status-line" id="examSubmitStatus">Every question has an answer selected — ready to submit.</div>
+        <label class="field-label" for="examExportFileName">Export PDF file name (optional — leave blank to use the default)</label>
+        <input type="text" id="examExportFileName" class="text-input" placeholder="e.g. Priya results">
         <div class="row">
           <button class="btn-primary" id="examSubmitBtn">📄 Submit &amp; export PDF</button>
         </div>
@@ -987,7 +1245,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   <footer>Prototype — speech recognition runs in your browser via the Web Speech API. The session log is saved locally in this browser only (never uploaded); export it if you need a copy elsewhere.
     <br>
-    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeeF9Pij2AycZD9NcDZzzYz9P-TNtkeDLJuYRzPpIEHLnYe3g/viewform?usp=header" target="_blank" rel="noopener noreferrer">Contact Q-Along</a>
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLSeeF9Pij2AycZD9NcDZzzYz9P-TNtkeDLJuYRzPpIEHLnYe3g/viewform?usp=header" target="_blank" rel="noopener noreferrer">Contact Guide My Pace</a>
   </footer>
 </div>
 
@@ -1049,10 +1307,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const examDoneEditingBtn = document.getElementById('examDoneEditingBtn');
   const examWorkCard      = document.getElementById('examWorkCard');
   const examWorkHeading   = document.getElementById('examWorkHeading');
+  const examPassageCard    = document.getElementById('examPassageCard');
+  const examPassageDetails = document.getElementById('examPassageDetails');
+  const examPassageArea    = document.getElementById('examPassageArea');
+  const examPassagePlayBtn  = document.getElementById('examPassagePlayBtn');
+  const examPassagePlayIcon = document.getElementById('examPassagePlayIcon');
+  const examPassageResetBtn = document.getElementById('examPassageResetBtn');
+  const examPassageStatus   = document.getElementById('examPassageStatus');
   const examNavRow            = document.getElementById('examNavRow');
   const examPrevQuestionBtn   = document.getElementById('examPrevQuestionBtn');
   const examNextQuestionBtn   = document.getElementById('examNextQuestionBtn');
   const examQuestionArea  = document.getElementById('examQuestionArea');
+  const examQuestionImagesEl = document.getElementById('examQuestionImages');
   const examQuestionPlayBtn   = document.getElementById('examQuestionPlayBtn');
   const examQuestionPlayIcon  = document.getElementById('examQuestionPlayIcon');
   const examQuestionStatus    = document.getElementById('examQuestionStatus');
@@ -1060,11 +1326,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const examOptionsList   = document.getElementById('examOptionsList');
   const examNotesBlock    = document.getElementById('examNotesBlock');
   const examNotesInput    = document.getElementById('examNotesInput');
+  const examNotesCaseSensitiveToggle = document.getElementById('examNotesCaseSensitiveToggle');
+  const examWordPredictBar = document.getElementById('examWordPredictBar');
   const examReadyBtn      = document.getElementById('examReadyBtn');
   const examAnswerBlock   = document.getElementById('examAnswerBlock');
   const examAnswerStatus  = document.getElementById('examAnswerStatus');
   const examSubmitBlock   = document.getElementById('examSubmitBlock');
   const examSubmitStatus  = document.getElementById('examSubmitStatus');
+  const examExportFileNameInput = document.getElementById('examExportFileName');
   const examSubmitBtn     = document.getElementById('examSubmitBtn');
   const liveTimer      = document.getElementById('liveTimer');
   const liveTimerValue = document.getElementById('liveTimerValue');
@@ -1085,6 +1354,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const ttsVoiceSelect    = document.getElementById('ttsVoiceSelect');
   const examSpeakerModeToggle = document.getElementById('examSpeakerModeToggle');
   const examSpeakerRateSelect = document.getElementById('examSpeakerRateSelect');
+  const examNaturalLanguageToggle = document.getElementById('examNaturalLanguageToggle');
+  const examPassageCoverToggle = document.getElementById('examPassageCoverToggle');
+  const examPassageMaskColorPicker = document.getElementById('examPassageMaskColorPicker');
+  const examPassageRevealControls = document.getElementById('examPassageRevealControls');
+  const examPassageRevealWordsSelect = document.getElementById('examPassageRevealWordsSelect');
+  const examPassageRevealLinesSelect = document.getElementById('examPassageRevealLinesSelect');
+  const examTextMatchToggle = document.getElementById('examTextMatchToggle');
+  const examMarkupToggle = document.getElementById('examMarkupToggle');
   const examDebugModeToggle = document.getElementById('examDebugModeToggle');
   const coverToggle    = document.getElementById('coverToggle');
   const maskColorPicker = document.getElementById('maskColorPicker');
@@ -1134,13 +1411,51 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let examSessionLog = [];       // Exam mode's own persisted log, one entry per Submit — same idea as
                                   // sessionLog above (persisted locally, exportable), kept in its own
                                   // array/storage key so the two modes' logs never mix.
-  const EXAM_LOG_STORAGE_KEY = 'qAlongExamSessionLog_v1';
+  const EXAM_LOG_STORAGE_KEY = 'guideMyPaceExamSessionLog_v1';
+  const EXAM_LOG_STORAGE_KEY_LEGACY_CUEFORWARD = 'cueForwardExamSessionLog_v1'; // pre-rename key —
+  const EXAM_LOG_STORAGE_KEY_LEGACY_QALONG = 'qAlongExamSessionLog_v1';        // and the one before
+                                                                  // that — both read as a fallback so
+                                                                  // a browser with an existing saved
+                                                                  // log (from before the Q-Along →
+                                                                  // CueForward → Guide My Pace renames)
+                                                                  // doesn't lose it; never written to.
 
   // ---------- exam mode state ----------
   let examOptionTexts = [];   // raw editable strings for the "check the question" stage (single question being edited)
   // The whole loaded set, worked through one at a time via the question navigator:
-  // [{ raw, words, scored, options: [{raw, words, scored, revealed}], selectedAnswer, optionsStarted, optionsRevealed, notes }]
+  // [{ raw, words, scored, options: [{raw, words, scored, revealed}], selectedAnswer, multiSelect,
+  //   selectedAnswers, optionsStarted, optionsRevealed, notes }] — multiSelect/selectedAnswers are
+  //   for "select all N that apply" questions (see examParseMultiSelectRequirement); every ordinary
+  //   single-answer question leaves multiSelect null and keeps using selectedAnswer exactly as before.
   let examQuestions = [];
+  // The shared reading passage detected ahead of the current set's questions (see
+  // examExtractPassageAndBody) — '' when the loaded document had none. One passage per load,
+  // shown identically for every question in the set rather than per-question.
+  let examPassageText = '';
+  // The passage's own word list (built once per load — see examRenderPassage), playable through
+  // the same shared engine as a question stem or answer choice (examEngineTarget === 'passage').
+  let examPassageWords = [];
+  // Per-paragraph-index flags from examBuildPassageWords — paraTight[i] true means paragraph i's
+  // own trailing gap (before the next paragraph) should render tight, no extra block spacing.
+  let examPassageParaTight = [];
+  // Set of examPassageWords indices currently highlighted by Text Match mode (see
+  // examRefreshTextMatches) — recomputed whenever the active question or the examTextMatchToggle
+  // changes, empty whenever that toggle is off. Independent of examMarkupEdits below — Text Match
+  // and Mark Up are two separate toggles that happen to share the same underlying phrase-matching.
+  let examTextMatchPassageIndices = new Set();
+  // Every question's own live edit preview, keyed by question index — Map<questionIndex,
+  // {start, toWords}> (toWords applied to examPassageWords[start..start+toWords.length)). An
+  // entry exists for question idx once its selected answer is shaped like "before → after" and
+  // "before" is found in the passage (see examUpdateMarkupEditForQuestion/examParseOptionEdit/
+  // examFindOptionEditTarget); it's deleted the moment that question's answer is cleared, changed
+  // to something not shaped like an edit, or a fresh document is loaded. Deliberately keyed by
+  // EVERY question, not just the active one, and never cleared on navigation — once a question's
+  // edit is recorded, it keeps showing in the passage (when examMarkupToggle is on) no matter which
+  // question you're currently viewing, so marking up several different questions' fixes stays
+  // visible together rather than only ever showing the one you're on right now.
+  let examMarkupEdits = new Map();
+  let examPassageScored = false; // has it been read/played at least once this load
+  let examPassageMode = null;    // 'read' | 'speaker' — which mode it was (most recently) read in
   let examQuestionIndex = -1;      // which question in the set is currently displayed, -1 = none loaded
   let examCurrentOptionIndex = -1; // which option (in the active question) the engine is actively listening to
 
@@ -1185,10 +1500,25 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let examSpeakerStartWatchdog = null;
   let examSpeakerKeepAliveTimer = null;
   let examSpeakerHardWatchdog = null;
+  // Natural Language mode (examNaturalLanguageToggle): an experimental, OFF-by-default alternative
+  // to the single continuous utterance above — Speaker mode instead reads a few words at a time
+  // (see examBuildPhraseChunks) with a brief real pause between each phrase. Entirely its own code
+  // path (examEngineStartSpeakerNatural below), reusing only the shared TTS-adjacent globals exam
+  // mode's plain path already reads/writes (examSpeakerUtterance, ttsSpeaking, muteRecognitionUntil)
+  // — kept behind its own toggle and its own functions specifically so the feature can be ripped
+  // out again later by deleting those, without touching the plain path at all.
+  let examNaturalLanguageMode = false; // off by default — matches examNaturalLanguageToggle's default
+  // `session` token guarding the between-chunk setTimeout specifically: examSpeakerUtterance is
+  // naturally null for a moment between one chunk's utterance ending and the next one starting, so
+  // it alone can't tell "proceeding normally" apart from "Stop was pressed mid-pause" — this can.
+  let examNaturalSpeakSession = null;
+  let examNaturalChunkTimer = null;
+  const EXAM_NATURAL_CHUNK_PAUSE_MS = 220;
   function examClearSpeakerTimers() {
     clearTimeout(examSpeakerStartWatchdog); examSpeakerStartWatchdog = null;
     clearInterval(examSpeakerKeepAliveTimer); examSpeakerKeepAliveTimer = null;
     clearTimeout(examSpeakerHardWatchdog); examSpeakerHardWatchdog = null;
+    clearTimeout(examNaturalChunkTimer); examNaturalChunkTimer = null;
   }
   // Debug mode: off by default. Submitting always downloads the PDF; only when this is checked
   // does Submit also write to the persistent session log and auto-download the word-level CSV —
@@ -2781,8 +3111,67 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // same thing in both places — see examProcessWord below for the (deliberately simpler) matching
   // logic this mode uses.
 
+  // Exam mode's own normalize, layered on top of the shared one instead of changing it — Read mode
+  // calls the shared normalize() too, and a standalone symbol (e.g. "/") stripping down to "" is
+  // harmless there, so that path is left exactly as it was. In Exam mode, a token made up ENTIRELY
+  // of symbols collapsing to "" made it invisible everywhere norms are compared: it could never be
+  // typed into Notes and matched against that same symbol in an answer choice, or scored via STT.
+  // Falling back to the trimmed, lowercased original keeps every other word identical to
+  // normalize()'s output and only changes symbol-only tokens, which now normalize to themselves.
+  function examNormalize(w) {
+    const stripped = normalize(w);
+    return stripped || w.trim().toLowerCase();
+  }
+
   function examBuildWords(text) {
-    return text.split(/\s+/).filter(Boolean).map(raw => ({ raw, norm: normalize(raw), status: 'pending', attempts: 0, heard: [], helperTriggered: false, helperSource: null }));
+    return text.split(/\s+/).filter(Boolean).map(raw => ({ raw, norm: examNormalize(raw), status: 'pending', attempts: 0, heard: [], helperTriggered: false, helperSource: null }));
+  }
+
+  // Splits text into paragraphs on the blank-line convention the rest of this file already uses
+  // (examJoinLinesWithParagraphGaps, examSplitPreambleAndBody, a user's own pasted text), with one
+  // addition: it tells a REAL paragraph break — exactly one blank line, either a genuinely large
+  // vertical gap examJoinLinesWithParagraphGaps found in the source PDF, or a blank line a person
+  // typed/pasted — apart from a "tight" break (two or more blank lines in a row), which is
+  // examJoinLinesWithParagraphGaps' own signal for a short, deliberate line (a dateline, a
+  // greeting, a quoted line inside a question) that still belongs visually close to what follows
+  // it rather than getting a full paragraph's worth of extra spacing. Returns one entry per
+  // paragraph — { text, tightAfter } — where tightAfter says whether THIS paragraph's own trailing
+  // gap (the one separating it from the next paragraph) should render tight; the last paragraph's
+  // tightAfter is meaningless (nothing follows it) and left false.
+  function examSplitParagraphsWithTightness(text) {
+    const raw = text || '';
+    const re = /\n[ \t]*\n+/g;
+    const paragraphs = [];
+    let lastIndex = 0;
+    let m;
+    while ((m = re.exec(raw))) {
+      const blankLineCount = (m[0].match(/\n/g) || []).length - 1; // 1 blank line => normal gap, 2+ => tight
+      paragraphs.push({ text: raw.slice(lastIndex, m.index).replace(/\s+/g, ' ').trim(), tightAfter: blankLineCount >= 2 });
+      lastIndex = re.lastIndex;
+    }
+    paragraphs.push({ text: raw.slice(lastIndex).replace(/\s+/g, ' ').trim(), tightAfter: false });
+    return paragraphs.filter(function (p) { return p.text.length > 0; });
+  }
+
+  // Same per-word object shape as examBuildWords, but with one addition: a `.para` index marking
+  // which paragraph each word belongs to, mirroring how Read mode's own loadText() breaks text
+  // into paragraphs before building its words (Read mode's code itself is untouched — this just
+  // follows the same split-on-blank-line convention). Used for both the passage and, now, a
+  // question's stem — anywhere multi-line structure from the source document needs to survive as
+  // more than one run-on line. examRenderPassageWords/examRenderQuestionArea use `.para`, together
+  // with the returned `paraTight` list, to wrap spans back into <p class="para-block"> blocks
+  // (tight ones getting no extra spacing) instead of one run-on line.
+  function examBuildPassageWords(text) {
+    const paragraphs = examSplitParagraphsWithTightness(text);
+    const words = [];
+    const paraTight = [];
+    paragraphs.forEach(function (para, paraIdx) {
+      paraTight[paraIdx] = !!para.tightAfter;
+      para.text.split(/\s+/).filter(Boolean).forEach(function (raw) {
+        words.push({ raw, norm: examNormalize(raw), status: 'pending', attempts: 0, heard: [], helperTriggered: false, helperSource: null, para: paraIdx });
+      });
+    });
+    return { words: words, paraTight: paraTight };
   }
 
   // Best-effort split of raw pasted/extracted/OCR'd text into ONE OR MORE questions, each with
@@ -2828,31 +3217,100 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     if (!dominant) return [];
 
     const questions = [];
+    // Each pendingStem entry is { text, newLine } — newLine true means a blank line (an ordinary
+    // paragraph break, or the tight short-line break examJoinLinesWithParagraphGaps inserts for a
+    // deliberate short line) separated it from whatever was pushed before it, so a stem built from
+    // several distinct original lines (a category label, a quoted line, an instruction) keeps that
+    // structure instead of getting silently flattened into one run-on line. blankSincePush tracks
+    // that signal while walking `lines`; pushBlankTracked below is the one place both branches
+    // record a blank line, so the two stay in sync without duplicating the bookkeeping.
     let pendingStem = [];
-    let current = null; // { stem, optHits: [{text}] }
+    let blankSincePush = false;
+    // "No gap, nothing queued yet" — !blankSincePush && pendingStem.length === 0 — means nothing
+    // ambiguous has happened since the last answer choice was matched/pushed (both branches reset
+    // blankSincePush to false right after a push, and startNew() clears pendingStem). A non-matching
+    // line that arrives while that's still true sits with NO gap at all right after that option —
+    // by far the most common reason is that the option itself simply wrapped onto a second (or
+    // third) line in the source PDF with no marker of its own, not that it's the start of the NEXT
+    // question's stem (genuine stem content is essentially always preceded by at least some gap,
+    // even if just the ordinary page-to-page join — see examExtractPdfText's
+    // `combined += '\n\n' + pageText`). pushBlankTracked below uses this to continue the last
+    // option instead of queuing the line as upcoming stem; examConsumeImageSentinel (just below)
+    // uses the exact same signal to decide whether a picture/table/chart belongs to the
+    // already-open question or the one about to start.
+    function pushBlankTracked(line) {
+      const cleaned = line.replace(/\s+/g, ' ').trim();
+      if (!blankSincePush && pendingStem.length === 0 && current && current.optHits.length && cleaned) {
+        const last = current.optHits[current.optHits.length - 1];
+        last.text = (last.text + ' ' + cleaned).trim();
+        return;
+      }
+      pendingStem.push({ text: line, newLine: blankSincePush });
+      blankSincePush = false;
+    }
+    let current = null; // { stem, optHits: [{text}], images: [idx,...] }
+
+    // A line that's really an image sentinel (see EXAM_IMG_SENTINEL_RE) is never real stem/option
+    // text — it's consumed here instead, before any of the three parsing branches below ever sees
+    // it, and its index is attached to whichever question owns it: directly onto `current` when a
+    // question is already open and nothing ambiguous (see pushBlankTracked above) has happened
+    // since its last option — covers an image landing between two options, or between the stem and
+    // the first option (including right after stemsMode's own `current = {...}`, where pendingStem
+    // is always empty and blankSincePush is never touched at all, so this is unconditionally true
+    // there, exactly as before this fix) — or queued in `pendingImages` otherwise, when the image
+    // instead belongs to whatever question is about to start. startNew() (and stemsMode's own
+    // inline `current = {...}`) picks that queue back up the moment that question is created.
+    // Callers must `return`/`continue` without any further handling once this returns true.
+    let pendingImages = [];
+    function examConsumeImageSentinel(line) {
+      if (!examIsImageSentinelLine(line)) return false;
+      const m = line.trim().match(EXAM_IMG_SENTINEL_RE);
+      const idx = m ? parseInt(m[1], 10) : NaN;
+      if (isNaN(idx)) return true; // malformed — drop it, but still don't treat it as content
+      if (current && !blankSincePush && pendingStem.length === 0) { current.images = current.images || []; current.images.push(idx); }
+      else pendingImages.push(idx);
+      return true;
+    }
 
     function finalizeCurrent() {
       if (current && current.optHits.length >= 2 && current.stem) {
-        questions.push({ stem: current.stem, options: current.optHits.map(h => h.text).filter(Boolean) });
+        questions.push({ stem: current.stem, options: current.optHits.map(h => h.text).filter(Boolean), images: current.images || [] });
       }
       current = null;
     }
     function startNew() {
-      current = { stem: pendingStem.join(' ').replace(/\s+/g, ' ').trim(), optHits: [] };
+      // A tight paragraph break ('\n\n\n') is what tells examBuildPassageWords/
+      // examSplitParagraphsWithTightness this is a deliberate line, not a run-on continuation —
+      // see their own comments for why three newlines specifically. An ordinary continuation still
+      // just joins with a space, exactly as it always has.
+      let stemText = '';
+      let firstSeg = true;
+      pendingStem.forEach(function (seg) {
+        const cleaned = seg.text.replace(/\s+/g, ' ').trim();
+        if (!cleaned) return;
+        if (firstSeg) { stemText = cleaned; firstSeg = false; }
+        else { stemText += (seg.newLine ? '\n\n\n' : ' ') + cleaned; }
+      });
+      current = { stem: stemText.trim(), optHits: [], images: pendingImages };
+      pendingImages = [];
       pendingStem = [];
+      blankSincePush = false;
     }
 
     if (dominant === 'bullet') {
       let gapSinceLastBullet = false;
       lines.forEach(line => {
+        if (!line.trim()) { blankSincePush = true; return; }
+        if (examConsumeImageSentinel(line)) return;
         const m = line.match(bulletRe);
         if (m) {
           if (current && current.optHits.length >= 2 && gapSinceLastBullet) { finalizeCurrent(); startNew(); }
           else if (!current) startNew();
           current.optHits.push({ text: m[2].trim() });
           gapSinceLastBullet = false;
-        } else if (line.trim()) {
-          pendingStem.push(line);
+          blankSincePush = false;
+        } else {
+          pushBlankTracked(line);
           if (current) gapSinceLastBullet = true;
         }
       });
@@ -2904,10 +3362,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
       if (stemsMode) {
         lines.forEach(line => {
+          if (examConsumeImageSentinel(line)) return;
           const m = line.match(re);
           if (m) {
             finalizeCurrent();
-            current = { stem: m[2].trim(), optHits: [] };
+            current = { stem: m[2].trim(), optHits: [], images: pendingImages };
+            pendingImages = [];
           } else if (line.trim() && current) {
             current.optHits.push({ text: line.trim() });
           }
@@ -2915,14 +3375,17 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       } else {
         let nextExpected = firstLabel;
         lines.forEach(line => {
+          if (!line.trim()) { blankSincePush = true; return; }
+          if (examConsumeImageSentinel(line)) return;
           const m = line.match(re);
           const label = m ? (dominant === 'letter' ? m[1].toUpperCase() : String(parseInt(m[1], 10))) : null;
           if (m && (label === nextExpected || label === firstLabel)) {
             if (label === firstLabel) { finalizeCurrent(); startNew(); }
             current.optHits.push({ text: m[2].trim() });
             nextExpected = advance(label === firstLabel ? firstLabel : nextExpected);
-          } else if (line.trim()) {
-            pendingStem.push(line);
+            blankSincePush = false;
+          } else {
+            pushBlankTracked(line);
           }
         });
       }
@@ -2953,7 +3416,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         // substitute and normalize it to an actual bullet character.
         const looksLikeRealMarker = /^\(?[A-Za-z][.):]$/.test(trimmed) || /^\(?\d{1,2}[.):]$/.test(trimmed);
         const prefix = looksLikeRealMarker ? trimmed : '●';
-        lines[i + 1] = { text: prefix + ' ' + next.text.trim(), y: next.y };
+        lines[i + 1] = { text: prefix + ' ' + next.text.trim(), y: next.y, right: next.right };
         continue; // drop the stray marker's own line — it's been folded into the next one
       }
       merged.push(cur);
@@ -3000,11 +3463,21 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // of where each item falls in the array), then sort those line-clusters top-to-bottom and each
   // line's own items left-to-right — reconstructing what's actually on the page rather than
   // trusting the order the items happened to be drawn in.
-  function examPdfItemsToText(items) {
+  // Pulled out of examPdfItemsToText (below) so the image-detection pass in examExtractPdfText can
+  // get at the raw {text, y, right} line array BEFORE it's merged/joined into a single string —
+  // that's the only place a large vertical gap between two text lines (a likely picture, table, or
+  // chart sitting between them) is still visible as a gap at all. examPdfItemsToText itself is
+  // unchanged in behavior; it just calls this instead of inlining the same steps.
+  function examItemsToLines(items) {
     const yTolerance = 2;
     const withPos = (items || []).map(function (it) {
       const t = it.transform;
-      return { str: it.str || '', x: t && t.length >= 6 ? t[4] : 0, y: t && t.length >= 6 ? t[5] : null };
+      return {
+        str: it.str || '',
+        x: t && t.length >= 6 ? t[4] : 0,
+        y: t && t.length >= 6 ? t[5] : null,
+        width: typeof it.width === 'number' ? it.width : 0,
+      };
     });
 
     const sortedByY = withPos.slice().sort(function (a, b) {
@@ -3023,25 +3496,137 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (it.y !== null) lastY = it.y;
     });
 
-    const lines = clusters.map(function (cl) {
+    return clusters.map(function (cl) {
       const ordered = cl.items.slice().sort(function (a, b) { return a.x - b.x; });
       let text = '';
+      // Track how far right this line's text actually reaches (its rightmost x + glyph width,
+      // both already given to us by pdf.js) — examJoinLinesWithParagraphGaps uses this to tell a
+      // line that was cut short by word-wrap (reaches near the page's usual right margin) apart
+      // from a deliberately short line (a dateline, a greeting) that doesn't.
+      let right = null;
       ordered.forEach(function (it) {
         if (!it.str) return;
         text += (text && !text.endsWith(' ') && !it.str.startsWith(' ') ? ' ' : '') + it.str;
+        const edge = it.x + (it.width || 0);
+        if (right === null || edge > right) right = edge;
       });
-      return { text: text.replace(/[ \t]+/g, ' ').trim(), y: cl.y };
+      return { text: text.replace(/[ \t]+/g, ' ').trim(), y: cl.y, right: right };
     }).filter(function (l) { return l.text.length > 0; });
+  }
 
-    return examMergeStrayMarkerLines(lines).map(function (l) { return l.text; }).join('\n');
+  function examPdfItemsToText(items) {
+    return examJoinLinesWithParagraphGaps(examMergeStrayMarkerLines(examItemsToLines(items)));
+  }
+
+  // Real text extraction never gets blank lines "for free" — pdf.js hands back individual
+  // line-clusters (built above) with no signal of whether two consecutive lines were tight
+  // together (a paragraph's own wrapped line) or separated by real vertical whitespace (a
+  // paragraph break, or a title sitting above its first paragraph). The Y position each cluster
+  // already carries is exactly that signal: compare the vertical gap between each pair of
+  // consecutive lines against the page's own typical single-line gap, and treat a gap noticeably
+  // larger than that as a paragraph break, inserting a blank line there — the same blank-line
+  // convention examSplitPreambleAndBody (and, downstream, the passage's own paragraph splitting)
+  // already treats as meaningful. A page with only one or two lines has no reliable "typical" gap
+  // to compare against, so it's left untouched exactly as before — a bare title or a one-line
+  // instruction never gets a spurious blank line inserted into it.
+  //
+  // The Y-gap alone misses a real case though: a short run of deliberately separate lines (a
+  // return-address block, a "Dear ___," greeting) that sit at completely ordinary single-line
+  // spacing from each other and from the paragraph that follows — nothing about their vertical
+  // gap looks any different from an everyday wrapped line, so they silently get flattened into one
+  // run-on paragraph downstream. What DOES set them apart is how far each line's text actually
+  // reaches: a line that got wrapped purely because it ran out of room reaches up to the page's
+  // usual right margin, while a short, deliberate line stops well short of it. SHORT_LINE_RATIO is
+  // the cutoff for "stops well short" — real wrapped prose lines in practice land at ~85-99% of the
+  // page's widest observed line, so a line under 78% of that is treated as intentionally short.
+  //
+  // A short line still gets its own paragraph break, same as a large Y-gap — but NOT the same
+  // size of gap: a dateline or a greeting is meant to sit close to what follows it, not get a full
+  // paragraph's worth of extra space. So the two kinds of break are marked differently in the
+  // output text — a real Y-gap break as one blank line ('\n\n'), a short-line break as two blank
+  // lines ('\n\n\n') — purely by how many blank lines separate the paragraphs, using nothing but
+  // ordinary whitespace, so every existing blank-line-tolerant consumer (examSplitPreambleAndBody,
+  // examSplitIntoQuestions, a plain `.split('\n')`) keeps working completely unchanged; only
+  // examSplitParagraphsWithTightness actually counts how many blank lines it was, to decide
+  // whether a paragraph renders with full spacing or sits tight against the next one.
+  const SHORT_LINE_WIDTH_RATIO = 0.78;
+  // Mirrors the Y-gap guard above: too few lines, or a page so narrow nothing ever reaches a
+  // meaningful width, means there's no reliable "typical full line" to compare against, so the
+  // check is skipped rather than risking a false short-line match.
+  const MIN_LINES_FOR_WIDTH_HEURISTIC = 3;
+  const MIN_MAX_WIDTH_FOR_HEURISTIC = 50;
+  // A salutation/greeting line ("Dear Anicka,", "Hi Sam,", "Hello team,") is, by letter-writing
+  // convention, always its own standalone paragraph: a blank line before it (separating it from
+  // whatever precedes — a dateline, a return address) and a blank line after it (before the body it
+  // introduces) — regardless of what the Y-gap and short-line-width heuristics above would
+  // otherwise conclude. A title or dateline can legitimately sit tight against its neighbor, but a
+  // greeting's surrounding blank lines carry real structural meaning that a PDF typeset at one
+  // uniform line height throughout can erase completely: when every line in the document (header
+  // block AND body) sits the exact same distance apart, there is no bigger-than-usual Y-gap left to
+  // detect, and a short greeting line is geometrically indistinguishable from a short dateline — the
+  // two heuristics above only recover a break that actually shows up as extra vertical space or an
+  // unusually short line, neither of which is true here. This is the one place content, not
+  // geometry, is the only signal left.
+  const EXAM_GREETING_LINE_RE = /^["“'`]*(dear|hi|hello|hey|greetings)\b/i;
+  function examIsGreetingLine(text) {
+    return EXAM_GREETING_LINE_RE.test((text || '').trim());
+  }
+  // A synthetic marker line, inserted by examDetectAndInsertPageImages (see there) at the exact
+  // spot in the line-stream where a picture/table/chart was found and rasterized out of the PDF
+  // page, standing in for the visual content so it can ride through the rest of the plain-text
+  // pipeline (merge, paragraph-gap joining, question splitting) completely unmodified — nothing
+  // downstream of here needs to know images exist at all except the two places that explicitly
+  // look for this exact pattern: examJoinLinesWithParagraphGaps (forces real blank lines on both
+  // sides of it, the same way a greeting line does, so it always lands on its own standalone line)
+  // and examSplitIntoQuestions (consumes it as the owning question's image, never as question
+  // text). Wrapped in Private-Use-Area characters so it can never collide with anything a real PDF
+  // would actually contain.
+  const EXAM_IMG_SENTINEL_RE = /^IMG:(\d+)$/;
+  function examImageSentinelLine(idx) {
+    return 'IMG:' + idx + '';
+  }
+  function examIsImageSentinelLine(text) {
+    return EXAM_IMG_SENTINEL_RE.test((text || '').trim());
+  }
+  function examJoinLinesWithParagraphGaps(lines) {
+    if (lines.length <= 1) return lines.map(function (l) { return l.text; }).join('\n');
+    const gaps = [];
+    for (let i = 1; i < lines.length; i++) {
+      const a = lines[i - 1].y, b = lines[i].y;
+      if (a != null && b != null) gaps.push(a - b); // pdf.js y increases upward, so this is >0 going down the page
+    }
+    let threshold = null;
+    if (gaps.length) {
+      const sortedGaps = gaps.slice().sort(function (x, y) { return x - y; });
+      const mid = Math.floor(sortedGaps.length / 2);
+      const median = sortedGaps.length % 2 ? sortedGaps[mid] : (sortedGaps[mid - 1] + sortedGaps[mid]) / 2;
+      threshold = median > 0 ? median * 1.4 : null;
+    }
+    const maxRight = lines.reduce(function (m, l) { return l.right != null && l.right > m ? l.right : m; }, 0);
+    const widthHeuristicActive = lines.length >= MIN_LINES_FOR_WIDTH_HEURISTIC && maxRight >= MIN_MAX_WIDTH_FOR_HEURISTIC;
+    let out = lines[0].text;
+    for (let i = 1; i < lines.length; i++) {
+      const a = lines[i - 1].y, b = lines[i].y;
+      const gap = (a != null && b != null) ? (a - b) : null;
+      const gapIsParagraphBreak = gap != null && threshold != null && gap > threshold;
+      const prevLineIsShort = widthHeuristicActive && lines[i - 1].right != null &&
+        lines[i - 1].right < maxRight * SHORT_LINE_WIDTH_RATIO;
+      const greetingBoundary = examIsGreetingLine(lines[i - 1].text) || examIsGreetingLine(lines[i].text);
+      const imageSentinelBoundary = examIsImageSentinelLine(lines[i - 1].text) || examIsImageSentinelLine(lines[i].text);
+      out += (gapIsParagraphBreak || greetingBoundary || imageSentinelBoundary) ? '\n\n' : (prevLineIsShort ? '\n\n\n' : '\n');
+      out += lines[i].text;
+    }
+    return out;
   }
 
   // Best-effort cleanup of common worksheet boilerplate before splitting into questions: the
   // document's own title heading (e.g. "Chapter 4: Early People of Texas Test"), a "Name: ___
   // Date: ___" blank line, and "Part N: ..." / "Section N: ..." dividers — none of these are ever
   // part of an actual question or answer choice, and left in they just get glued onto whichever
-  // question follows.
-  function examStripBoilerplateLines(text) {
+  // question follows. Split out of a single body-only function so the same walk can ALSO hand back
+  // everything it drops before the first real question line — see examExtractPassageAndBody, which
+  // uses that leftover preamble to detect a reading passage instead of just throwing it away.
+  function examSplitPreambleAndBody(text) {
     const isNameDateLine = function (line) {
       return /_{3,}/.test(line) && (/\bname\b/i.test(line) || /\bdate\b/i.test(line));
     };
@@ -3055,22 +3640,52 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         /^[•●▪‣◦▶►○■□→✓✔☐❑♦∙*–—-]\s+/.test(line);
     };
     let sawContent = false;
-    const kept = (text || '').split('\n').filter(function (line) {
+    const bodyLines = [];
+    const preambleLines = [];
+    (text || '').split('\n').forEach(function (line) {
       const trimmed = line.trim();
-      if (!trimmed) return true; // keep blank lines — they matter for bullet-run gap detection
-      if (isNameDateLine(trimmed)) return false;
-      if (isSectionHeading(trimmed)) return false;
+      if (!trimmed) {
+        bodyLines.push(line); // keep blank lines — they matter for bullet-run gap detection
+        if (!sawContent) preambleLines.push(line); // ...and mark a paragraph break in the passage too
+        return;
+      }
+      if (isNameDateLine(trimmed) || isSectionHeading(trimmed)) return; // dropped everywhere, same as before
       if (!sawContent) {
-        // Keep dropping preamble lines (title, "switch account", the submitter's own email, etc.)
-        // until one of them actually looks like real question/answer content — not just the very
-        // first non-empty line, which is sometimes only the first of SEVERAL junk lines (a Google
-        // Forms export's header block, for instance, runs several lines deep).
-        if (!looksLikeQuestionContent(trimmed)) return false;
+        // Keep dropping preamble lines (title, "switch account", the submitter's own email, a
+        // reading passage, etc.) until one of them actually looks like real question/answer
+        // content — not just the very first non-empty line, which is sometimes only the first of
+        // SEVERAL junk lines (a Google Forms export's header block, for instance, runs several
+        // lines deep).
+        if (!looksLikeQuestionContent(trimmed)) { preambleLines.push(line); return; }
         sawContent = true;
       }
-      return true;
+      bodyLines.push(line);
     });
-    return kept.join('\n');
+    return { preamble: preambleLines.join('\n').trim(), body: bodyLines.join('\n') };
+  }
+
+  function examStripBoilerplateLines(text) {
+    return examSplitPreambleAndBody(text).body;
+  }
+
+  // A passage only counts as one when it's substantial — short preamble text (a bare title, a
+  // one-line instruction like "Circle the best answer") stays silently dropped exactly as it
+  // always was, rather than turning into a mostly-empty "Passage" section on an ordinary quiz.
+  const EXAM_PASSAGE_MIN_WORDS = 25;
+
+  function examPassageWordCount(text) {
+    return (text || '').trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  // Detects a leading reading passage — a title plus one or more paragraphs sitting before the
+  // first question, like "The Austin Flood" — and separates it from the text that actually gets
+  // split into questions. No literal "Passage" label is required: the same preamble that used to
+  // be silently discarded (see examSplitPreambleAndBody) becomes the passage whenever it's long
+  // enough to plausibly BE one.
+  function examExtractPassageAndBody(text) {
+    const split = examSplitPreambleAndBody(text);
+    const passage = examPassageWordCount(split.preamble) >= EXAM_PASSAGE_MIN_WORDS ? split.preamble : '';
+    return { passage: passage, body: split.body.trim() };
   }
 
   // Google Forms (and similar quiz-platform exports) always end the actual form content with its
@@ -3110,6 +3725,125 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     }).join('\n');
   }
 
+  // A gap between two consecutive text lines that's unusually large — well beyond even a normal
+  // paragraph break — is the one geometric signal that a picture, table, or chart might be sitting
+  // in the empty space between them (the PDF's own text layer never describes visual content, only
+  // the text around it, so there's no other way to notice one is there at all). Any page with at
+  // least one such gap gets rasterized once (the same page.render({canvasContext, viewport}) pdf.js
+  // call already used for OCR below), the candidate's vertical band is cropped out of that
+  // full-page render via the viewport's own coordinate mapping (so rotation/scale are handled the
+  // same way pdf.js itself would), and it's kept only if the crop turns out to have real non-blank
+  // pixel content — otherwise it's just unusually generous whitespace (a section break, a
+  // deliberately empty answer box) and is left alone, untouched. Each image that survives is
+  // pushed onto `imagesOut` and a sentinel line (examImageSentinelLine) referencing its index is
+  // spliced into `lines` at the exact gap it was found in, so it rides through the rest of the
+  // plain-text pipeline (merge, paragraph-gap joining, question splitting) like any other line —
+  // see EXAM_IMG_SENTINEL_RE's own comment for how it's consumed back out again.
+  const EXAM_IMAGE_GAP_MIN_POINTS = 50;
+  const EXAM_IMAGE_GAP_MEDIAN_MULTIPLIER = 2.2;
+  const EXAM_IMAGE_RENDER_SCALE = 2;
+  const EXAM_IMAGE_MIN_CONTENT_RATIO = 0.01;
+  // The crop is always the FULL page width (see examDetectAndInsertPageImages), even though a real
+  // picture/table/chart is often narrower than the page and/or mostly whitespace itself (a thin-lined
+  // diagram, a sparse table grid). That dilutes the ratio above by however much blank margin surrounds
+  // the actual content, independent of whether the content itself is real — a legitimate but sparse
+  // image can land under EXAM_IMAGE_MIN_CONTENT_RATIO even though it is clearly non-blank. This is an
+  // absolute floor (estimated real pixel count, not a sampled count) that catches that case: a true
+  // blank gap has essentially zero non-background pixels no matter how wide the crop is, so a large
+  // absolute amount of ink is still strong evidence of real content even at a low ratio.
+  const EXAM_IMAGE_MIN_CONTENT_PIXELS = 150;
+  const EXAM_IMAGE_MIN_CROP_HEIGHT_PX = 10;
+
+  // Cheap non-blank check: a real picture/table/chart almost always has SOME ink well below full
+  // white, even if most of its area is background — sampled rather than checked pixel-by-pixel so
+  // a large crop on a high-DPI render doesn't become a performance problem.
+  function examCanvasHasContent(ctx, w, h) {
+    if (w <= 0 || h <= 0) return false;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const totalPixels = w * h;
+    const sampleStep = Math.max(1, Math.floor(totalPixels / 20000));
+    let nonBackground = 0, samples = 0;
+    for (let p = 0; p < data.length; p += 4 * sampleStep) {
+      const r = data[p], g = data[p + 1], b = data[p + 2], a = data[p + 3];
+      samples++;
+      if (a > 10 && (r < 245 || g < 245 || b < 245)) nonBackground++;
+    }
+    if (samples === 0) return false;
+    if ((nonBackground / samples) >= EXAM_IMAGE_MIN_CONTENT_RATIO) return true;
+    // Ratio alone missed it — see EXAM_IMAGE_MIN_CONTENT_PIXELS' own comment. nonBackground*sampleStep
+    // estimates the true count from the sampled rate (every sampleStep-th pixel was checked).
+    return (nonBackground * sampleStep) >= EXAM_IMAGE_MIN_CONTENT_PIXELS;
+  }
+
+  async function examDetectAndInsertPageImages(lines, page, imagesOut) {
+    if (!lines || lines.length < 2) return lines;
+    const gaps = [];
+    for (let i = 1; i < lines.length; i++) {
+      const a = lines[i - 1].y, b = lines[i].y;
+      if (a != null && b != null) gaps.push(a - b);
+    }
+    if (!gaps.length) return lines;
+    const sortedGaps = gaps.slice().sort(function (x, y) { return x - y; });
+    const mid = Math.floor(sortedGaps.length / 2);
+    const median = sortedGaps.length % 2 ? sortedGaps[mid] : (sortedGaps[mid - 1] + sortedGaps[mid]) / 2;
+    const threshold = Math.max(EXAM_IMAGE_GAP_MIN_POINTS, median > 0 ? median * EXAM_IMAGE_GAP_MEDIAN_MULTIPLIER : EXAM_IMAGE_GAP_MIN_POINTS);
+
+    const candidateIdxs = [];
+    for (let i = 1; i < lines.length; i++) {
+      const a = lines[i - 1].y, b = lines[i].y;
+      if (a == null || b == null) continue;
+      if ((a - b) >= threshold) candidateIdxs.push(i);
+    }
+    if (!candidateIdxs.length) return lines;
+
+    // Only now — once we know at least one candidate gap exists — is the page actually rendered to
+    // a canvas; most pages (plain text, no embedded visuals) never pay this cost at all.
+    const viewport = page.getViewport({ scale: EXAM_IMAGE_RENDER_SCALE });
+    const fullCanvas = document.createElement('canvas');
+    fullCanvas.width = viewport.width;
+    fullCanvas.height = viewport.height;
+    await page.render({ canvasContext: fullCanvas.getContext('2d'), viewport }).promise;
+
+    const result = lines.slice();
+    let offset = 0; // each inserted sentinel shifts every later candidate's index in `result` by one
+    for (const origIdx of candidateIdxs) {
+      const i = origIdx + offset;
+      const topLine = result[i - 1], bottomLine = result[i];
+      // pdf.js reports each line's y as its text BASELINE, not its visual top/bottom — real glyphs
+      // extend well above that baseline (a cap-height/ascent commonly 70-85% of the font size) and
+      // only a little below it (a descender, commonly 15-25%). Clearing the PRECEDING line only
+      // needs to clear its much smaller descent; clearing the FOLLOWING line needs to clear its
+      // much larger ascent, or the crop's own bottom edge slices through the top sliver of that
+      // line's text — exactly the "captured a little bit of option A" bug this asymmetry fixes.
+      const topPadding = 6;
+      const bottomPadding = 14;
+      const topPdfY = topLine.y - topPadding;
+      const bottomPdfY = bottomLine.y + bottomPadding;
+      // PDF y increases upward; viewport (canvas pixel) y increases downward — convertToViewportPoint
+      // does that flip (plus scale/rotation) for us, so min/max rather than assuming an order.
+      const p1 = viewport.convertToViewportPoint(0, topPdfY);
+      const p2 = viewport.convertToViewportPoint(0, bottomPdfY);
+      const cropTop = Math.max(0, Math.round(Math.min(p1[1], p2[1])));
+      const cropBottom = Math.min(fullCanvas.height, Math.round(Math.max(p1[1], p2[1])));
+      const cropHeight = cropBottom - cropTop;
+      if (cropHeight < EXAM_IMAGE_MIN_CROP_HEIGHT_PX) continue;
+
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = fullCanvas.width;
+      cropCanvas.height = cropHeight;
+      const cropCtx = cropCanvas.getContext('2d');
+      cropCtx.drawImage(fullCanvas, 0, cropTop, fullCanvas.width, cropHeight, 0, 0, fullCanvas.width, cropHeight);
+
+      if (!examCanvasHasContent(cropCtx, cropCanvas.width, cropCanvas.height)) continue; // just whitespace — leave it alone
+
+      const idx = imagesOut.length;
+      imagesOut.push({ data: cropCanvas.toDataURL('image/png'), w: cropCanvas.width, h: cropCanvas.height });
+      result.splice(i, 0, { text: examImageSentinelLine(idx), y: (topLine.y + bottomLine.y) / 2, right: 0 });
+      offset++;
+    }
+    return result;
+  }
+
   async function examExtractPdfText(file) {
     if (typeof pdfjsLib === 'undefined') {
       throw new Error('the PDF reader library did not load (check your internet connection) — you can still type the question in below');
@@ -3130,11 +3864,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     // genuinely looks like a scanned document, not a mostly-digital one with a decorative page.
     const pages = [];
     let anySubstantialText = false;
+    const extractedImages = []; // flat across the whole document — examSplitIntoQuestions-attached sentinel indices refer into this
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       examPdfStatus.textContent = 'Reading page ' + pageNum + ' of ' + pdf.numPages + '…';
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const pageText = examPdfItemsToText(textContent.items).trim();
+      const rawLines = examItemsToLines(textContent.items);
+      const linesWithImages = await examDetectAndInsertPageImages(rawLines, page, extractedImages);
+      const pageText = examJoinLinesWithParagraphGaps(examMergeStrayMarkerLines(linesWithImages)).trim();
       if (pageText.length >= 15) anySubstantialText = true;
       pages.push({ pageNum, page, itemCount: textContent.items.length, pageText });
     }
@@ -3164,7 +3901,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         combined += (combined ? '\n\n' : '') + (result.data.text || '').trim();
       }
     }
-    return examStripBoilerplateLines(examStripFormFooter(examNormalizeStrayLetterBullets(combined.trim()))).trim();
+    // Returns { passage, body, images } rather than a bare string — see examExtractPassageAndBody.
+    // `body` is what gets split into questions; `passage`, when non-empty, is a shared reading
+    // passage detected ahead of them; `images` is the flat, document-wide array of rasterized
+    // picture/table/chart crops that examSplitIntoQuestions' sentinel indices refer into — see
+    // examBeginQuestionSet, which resolves each question's indices back into this array.
+    const extracted = examExtractPassageAndBody(examStripFormFooter(examNormalizeStrayLetterBullets(combined.trim())));
+    extracted.images = extractedImages;
+    return extracted;
   }
 
   function examOpenEditStage(stemText, optionTexts) {
@@ -3199,11 +3943,54 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       .trim();
   }
 
-  function examBuildQuestionEntry(stem, options) {
+  // Detects a multi-select question — one where more than one answer choice should be picked —
+  // from its own stem text, so it can be rendered with checkboxes instead of the usual single-
+  // answer radio buttons. N can be a digit or a spelled-out number up to ten. Returns null for an
+  // ordinary single-answer question. Returns { required } for a multi-select one — `required` is
+  // the parsed count when the stem states one, or null when it's clear this is multi-select but no
+  // exact count could be parsed, meaning that count can't be enforced for this question (see
+  // examQuestionIsFinished).
+  //
+  // Two phrasings are recognized, independently:
+  //   (a) "select/choose/check/pick/mark all [N] ... apply" — e.g. "Select all 3 that apply",
+  //       "Choose all three that apply", "Select all 3 answers that apply" (up to ~30 characters of
+  //       other words tolerated between "all" and "apply"). A bare "...all that apply" with no
+  //       number is still multi-select, just with required left null.
+  //   (b) the same verbs directly followed (only whitespace/punctuation, optionally "the", in
+  //       between — never other words) by a count of 2 or more — e.g. "(Select 2)",
+  //       "Select 2 answers", "Choose two correct answers". A count of exactly one ("Select 1" /
+  //       "Choose one") is deliberately left alone, since that's just an ordinary single-answer
+  //       question already handled by the regular radio-button flow — only two or more switches it
+  //       to checkboxes.
+  const EXAM_NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+  function examNumberTokenValue(token) {
+    if (!token) return null;
+    return /^\d+$/.test(token) ? parseInt(token, 10) : (EXAM_NUMBER_WORDS[token.toLowerCase()] || null);
+  }
+  function examParseMultiSelectRequirement(stemText) {
+    const text = stemText || '';
+    const allMatch = text.match(/\b(?:select|choose|check|pick|mark)\s+all\b\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)?[^.?!\n]{0,30}?\bappl(?:y|ies)\b/i);
+    if (allMatch) return { required: examNumberTokenValue(allMatch[1]) };
+    const countMatch = text.match(/\b(?:select|choose|check|pick|mark)\b\W{0,10}(?:the\s+)?(\d+|two|three|four|five|six|seven|eight|nine|ten)\b/i);
+    if (countMatch) {
+      const n = examNumberTokenValue(countMatch[1]);
+      if (n && n >= 2) return { required: n };
+    }
+    return null;
+  }
+
+  function examBuildQuestionEntry(stem, options, images) {
     const cleanStem = examStripLeadingMarker(stem);
+    // examSplitIntoQuestions marks a stem line that started fresh (a blank line separated it from
+    // what came before — see its own pendingStem handling) with a tight paragraph break, so a
+    // multi-line stem (a category label, a quoted line, an instruction, each on its own original
+    // line) renders the same way the passage does: separate lines, no run-on flattening, no full
+    // paragraph-sized gap between them. A plain single-line stem just comes back as one paragraph.
+    const builtStem = examBuildPassageWords(cleanStem);
     return {
       raw: cleanStem,
-      words: examBuildWords(cleanStem),
+      words: builtStem.words,
+      stemParaTight: builtStem.paraTight,
       scored: false,
       mode: null, // 'read' | 'speaker' — which mode the stem was (most recently) read in; see examQuestionPlayBtn's click handler
       options: options.map(t => {
@@ -3211,9 +3998,22 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         return { raw: cleanOpt, words: examBuildWords(cleanOpt), scored: false, revealed: false, mode: null };
       }),
       selectedAnswer: -1,
+      // Multi-select ("select all N that apply") support — entirely separate from selectedAnswer
+      // above, which stays untouched (-1) for a multi-select question and is what single-select
+      // questions keep using exactly as before. multiSelect is null for an ordinary single-answer
+      // question (see examParseMultiSelectRequirement); when set, selectedAnswers holds every
+      // currently-checked option index (unsorted order of selection — always read through
+      // examQuestionIsFinished/sorted display, never assumed sorted here).
+      multiSelect: examParseMultiSelectRequirement(cleanStem),
+      selectedAnswers: [],
       optionsStarted: false,
       optionsRevealed: false,
-      notes: ''
+      notes: '',
+      // Picture/table/chart crops (see examDetectAndInsertPageImages) that belong to this question
+      // — rendered between the stem and the answer choices (examRenderQuestionImages) and included
+      // the same way in the exported results PDF (examExportPdf). Always an array, never missing,
+      // so every other reader of a question object can use it without a null check.
+      images: images || []
     };
   }
 
@@ -3239,13 +4039,22 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
 
   function examUpdateSubmitVisibility() {
-    const allAnswered = examQuestions.length > 0 && examQuestions.every(q => q.selectedAnswer !== -1);
+    const allAnswered = examQuestions.length > 0 && examQuestions.every(examQuestionIsFinished);
     examSubmitBlock.hidden = !allAnswered;
   }
 
-  // "Finished" means an answer has been picked — the same bar examUpdateSubmitVisibility uses.
+  // "Finished" means an answer has been picked — the same bar examUpdateSubmitVisibility uses. For
+  // an ordinary single-answer question that's still just selectedAnswer !== -1, unchanged. For a
+  // multi-select ("select all N that apply") question, it's finished once exactly N are checked —
+  // or, when the stem didn't state a parseable count (multiSelect.required is null), once at least
+  // one is checked, since there's no exact target to enforce.
   function examQuestionIsFinished(q) {
-    return !!q && q.selectedAnswer !== -1;
+    if (!q) return false;
+    if (q.multiSelect) {
+      const required = q.multiSelect.required;
+      return required != null ? q.selectedAnswers.length === required : q.selectedAnswers.length > 0;
+    }
+    return q.selectedAnswer !== -1;
   }
 
   // The next question only becomes reachable once the current one is finished — keeps the
@@ -3279,6 +4088,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examUpdateNavGating();
 
     examNotesInput.value = q.notes || '';
+    examHideWordPredictions(); // stale suggestions from the previous question's caret position
     examQuestionStatus.textContent = examQuestionHintText(q);
     examNotesBlock.hidden = !q.scored;
     examOptionsBlock.hidden = !q.optionsRevealed;
@@ -3287,26 +4097,637 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examUpdateReadyBtnGating();
     if (q.optionsStarted) {
       examAnswerStatus.textContent = q.options.every(o => o.scored)
-        ? 'All answer choices read — choose your answer below.'
+        ? ('All answer choices read — choose your answer' + (q.multiSelect ? 's' : '') + ' below.')
         : 'Play any answer choice to read it aloud.';
     }
 
     examRenderQuestionArea();
+    examRenderQuestionImages();
     examRenderOptionsList();
     examUpdateSubmitVisibility();
+    examRefreshTextMatches();
+  }
+
+  // Strips only LEADING/TRAILING punctuation (quote marks, brackets, sentence-ending periods, and
+  // the like) from a word for Text Match comparison, while preserving everything else — critically
+  // including case: this feature is about spotting the exact phrase a question quotes, so unlike
+  // examNormalize (which also lowercases, for fuzzy speech-matching) it must never fold case, or a
+  // worksheet asking the reader to spot "japan" vs "Japan" would match both and defeat the point —
+  // for passage text that's still showing its original, possibly-wrong wording. Mark Up-edited text
+  // is a different story — see examFindTextMatches' own `edited` handling just below.
+  function examTextMatchKey(raw) {
+    return (raw || '').replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+  }
+
+  // A match shorter than this is too likely to be an ordinary shared word ("the", "a") rather than
+  // a meaningful quoted phrase, so it's never highlighted.
+  const MIN_TEXT_MATCH_WORDS = 2;
+
+  // Pure matching core (no DOM/module-state dependency, so it's directly testable): given two
+  // plain arrays of word objects (anything with a `.raw`), returns the Set of PASSAGE indices that
+  // take part in an exact phrase of MIN_TEXT_MATCH_WORDS+ consecutive words also found in
+  // `queryWords`, case-sensitive once surrounding punctuation is stripped (see examTextMatchKey) —
+  // EXCEPT at a passage word marked `edited: true` (examDisplayedPassageWords' Mark Up stand-ins),
+  // which compares case-INSENSITIVELY instead. That exception fixes a real bug: a Capitals
+  // question's own quote always shows the original wrong casing ("japan") — that's the premise of
+  // the category — so once the reader picks the Mark Up fix that capitalizes it on screen ("Japan"),
+  // a case-sensitive comparison of the question's own quote against its own now-corrected passage
+  // text stops matching, and the highlight silently drops out (invisible in the moment, since the
+  // reader is focused on answering — it only becomes obvious on navigating back to recheck). An
+  // UNedited word never gets this leniency, so the exact scenario examTextMatchKey's own comment
+  // warns about — an untouched, still-wrong "japan" coincidentally case-matching something it
+  // shouldn't — is unaffected.
+  function examFindTextMatches(queryWords, passageWords) {
+    const matched = new Set();
+    const queryKeys = queryWords.map(w => examTextMatchKey(w.raw));
+    const queryKeysCi = queryWords.map(w => examTextMatchKey(w.raw).toLowerCase());
+    const passageKeys = passageWords.map(w => examTextMatchKey(w.raw));
+    const passageKeysCi = passageWords.map(w => examTextMatchKey(w.raw).toLowerCase());
+    const passageEdited = passageWords.map(w => !!w.edited);
+    function sameWord(i, j) {
+      return passageEdited[j] ? (queryKeysCi[i] === passageKeysCi[j]) : (queryKeys[i] === passageKeys[j]);
+    }
+    for (let i = 0; i < queryKeys.length; i++) {
+      if (!queryKeys[i]) continue;
+      for (let j = 0; j < passageKeys.length; j++) {
+        if (!sameWord(i, j)) continue;
+        let len = 1;
+        while (i + len < queryKeys.length && j + len < passageKeys.length &&
+          queryKeys[i + len] && sameWord(i + len, j + len)) len++;
+        if (len >= MIN_TEXT_MATCH_WORDS) {
+          for (let k = 0; k < len; k++) matched.add(j + k);
+        }
+      }
+    }
+    return matched;
+  }
+
+  // Recognizes an answer option shaped like a "find the fix" edit — "before → after" — so Mark Up
+  // mode can preview it in the passage once the reader selects it (see examFindOptionEditTarget/
+  // examMarkupEdits). Matches the arrow pdf.js actually extracts for this question type (→, U+2192)
+  // plus the plain-ASCII spellings a hand-typed or pasted option might use instead (->, -->, =>).
+  // Returns null for any option that isn't shaped this way — a full revised line ("Kamakura,
+  // Japan") or an instruction sentence ("Put a period after “long.”") — those simply get
+  // no passage preview, only the ordinary Text Match highlight (if any).
+  const EXAM_OPTION_EDIT_ARROW_RE = /\s*(?:→|-->|->|=>)\s*/;
+  function examParseOptionEdit(raw) {
+    const text = (raw || '').trim();
+    if (!text || !EXAM_OPTION_EDIT_ARROW_RE.test(text)) return null;
+    const parts = text.split(EXAM_OPTION_EDIT_ARROW_RE);
+    if (parts.length !== 2) return null;
+    const from = parts[0].trim();
+    const to = parts[1].trim();
+    if (!from || !to) return null;
+    return { from: from, to: to };
+  }
+
+  // A question's own quoted phrase — e.g. the "Kamakura Japan" in `Category: Commas (Hint:
+  // City/state/country) “Kamakura Japan” Find the comma fix.` — pulled straight from its raw stem
+  // text. Supports the curly quotes pdf.js actually extracts for this question type (“ ”) and
+  // plain straight quotes ("), in case a question was instead typed or pasted by hand. Returns null
+  // when the stem has no quoted text at all. Used only by examParseOptionEditFromQuoted, below.
+  function examExtractQuotedPhrase(stemRaw) {
+    const m = (stemRaw || '').match(/[“"]([^”"]+)[”"]/);
+    return m ? m[1].trim() : null;
+  }
+
+  // A second shape Mark Up recognizes for an answer option, alongside "before → after"
+  // (examParseOptionEdit) — tried only once that one comes back null. Some categories (a comma
+  // fix, for instance) give the FULL corrected phrase as the option's own text ("Kamakura, Japan")
+  // rather than an arrow pair, with "before" being whatever phrase the question itself quotes
+  // ("Kamakura Japan"). Recognized only when the quoted phrase and the option have the SAME word
+  // count: an instruction sentence like "Put a period after “long.”" (5 words) against a long
+  // quoted passage sentence (many words) never matches on count, so this never misfires into that
+  // unrelated category and propose some nonsensical multi-word swap. Returns null when the
+  // question has no quoted phrase, or the word counts don't line up.
+  function examParseOptionEditFromQuoted(stemRaw, optionRaw) {
+    const quoted = examExtractQuotedPhrase(stemRaw);
+    if (!quoted) return null;
+    const quotedWords = examBuildWords(quoted);
+    const optionWords = examBuildWords(optionRaw);
+    if (!quotedWords.length || quotedWords.length !== optionWords.length) return null;
+    return { from: quoted, to: optionRaw };
+  }
+
+  // A third shape Mark Up recognizes for an answer option — tried only once BOTH the arrow shape
+  // (examParseOptionEdit) and the full-phrase quoted shape (examParseOptionEditFromQuoted, just
+  // above) come back null. Some categories (a capitalization fix, for instance) give just the ONE
+  // corrected word as the option's own text ("Japan") rather than an arrow pair or the whole
+  // corrected phrase, leaving it to the reader to recognize which word of the question's own quoted
+  // phrase ("Kamakura japan") it's correcting. Recognized only when the option is a SINGLE word that
+  // matches EXACTLY ONE word of the quote case-insensitively (examNormalize) — two or more quoted
+  // words sharing the same letters would make the target ambiguous, so that's left unrecognized
+  // rather than guessed at; so is an option that already matches some quoted word exactly (nothing
+  // to correct). "from" is that quoted word's OWN text (its capitalization may not match the
+  // passage's actual text at all — see examFindOptionEditTargetLoose, which is why this shape is
+  // always located case-insensitively, same as the full-phrase fallback above).
+  function examParseOptionEditFromQuotedWord(stemRaw, optionRaw) {
+    const quoted = examExtractQuotedPhrase(stemRaw);
+    if (!quoted) return null;
+    const quotedWords = examBuildWords(quoted);
+    const optionWords = examBuildWords(optionRaw);
+    if (optionWords.length !== 1 || !quotedWords.length) return null;
+    const optionKey = examNormalize(optionWords[0].raw);
+    const candidates = quotedWords.filter(w => examNormalize(w.raw) === optionKey);
+    if (candidates.length !== 1) return null;
+    const target = candidates[0];
+    if (target.raw === optionWords[0].raw) return null;
+    return { from: target.raw, to: optionWords[0].raw };
+  }
+
+  // A fourth shape Mark Up recognizes for an answer option — tried only once the arrow shape, the
+  // full-phrase quoted shape, AND the single-quoted-word shape (all three above) come back null.
+  // Some categories (a helping-verb grammar fix, for instance) give a SHORT multi-word fragment as
+  // the option's own text ("will meet") rather than an arrow pair, the whole corrected phrase, or a
+  // single word — leaving it to the reader to recognize which contiguous span of the question's own
+  // quoted phrase ("In a week I will meeting you.") it corrects. Tried only for an option strictly
+  // SHORTER than the quote (the equal-length case is examParseOptionEditFromQuoted's job, the
+  // single-word case is examParseOptionEditFromQuotedWord's) AND only when the quote itself is SHORT
+  // (at most EXAM_QUOTED_SPAN_MAX_QUOTE_WORDS words): every same-length contiguous span of the quote
+  // is scored by how many of its words match the option position-for-position, case-insensitively
+  // (examNormalize) — "will meeting" scores 1 of 2 against "will meet" (their shared "will"), while
+  // every other 2-word span of that quote scores 0. Recognized only when there's a SINGLE
+  // highest-scoring span, with at most one word actually differing from the option (same "a single
+  // wrong word" shape as the dedicated single-word fallback, just letting the matching, unchanged
+  // word(s) around it anchor WHERE in the quote that one word sits) — a tie for the best score, or a
+  // best score that still leaves two or more words different, is left unrecognized rather than
+  // guessed at, the same caution every quoted-based shape above takes. The quote-length cap exists
+  // because this scoring has no idea which word is semantically meaningful — on a long enough quote,
+  // a short, totally unrelated option can coincidentally land a 1-word match against some filler
+  // word ("the", "a") purely by chance (caught live while testing: a 2-word option scored 1-of-2
+  // against a 15-word Periods-category quote on "the" alone). The categories that actually use this
+  // shape quote only a short fragment to begin with (7 words in the real example above) — a quote
+  // long enough to need the cap was never this shape's quote in the first place, so it's excluded.
+  // "from" is the winning span's OWN text from the quote (again possibly cased differently than the
+  // passage's actual text — located case-insensitively, same as the shapes above).
+  const EXAM_QUOTED_SPAN_MAX_QUOTE_WORDS = 12;
+  function examParseOptionEditFromQuotedSpan(stemRaw, optionRaw) {
+    const quoted = examExtractQuotedPhrase(stemRaw);
+    if (!quoted) return null;
+    const quotedWords = examBuildWords(quoted);
+    const optionWords = examBuildWords(optionRaw);
+    const n = optionWords.length;
+    if (!n || n >= quotedWords.length || quotedWords.length > EXAM_QUOTED_SPAN_MAX_QUOTE_WORDS) return null;
+    const optionKeys = optionWords.map(w => examNormalize(w.raw));
+    let bestScore = -1;
+    let bestStart = -1;
+    let tied = false;
+    for (let start = 0; start + n <= quotedWords.length; start++) {
+      let score = 0;
+      for (let k = 0; k < n; k++) {
+        if (examNormalize(quotedWords[start + k].raw) === optionKeys[k]) score++;
+      }
+      if (score > bestScore) { bestScore = score; bestStart = start; tied = false; }
+      else if (score === bestScore) { tied = true; }
+    }
+    if (bestStart === -1 || tied || bestScore < n - 1) return null;
+    const span = quotedWords.slice(bestStart, bestStart + n);
+    const fromText = span.map(w => w.raw).join(' ');
+    if (fromText === optionRaw.trim()) return null;
+    return { from: fromText, to: optionRaw };
+  }
+
+  // Shared core behind both examFindOptionEditTarget and examFindOptionEditTargetLoose, below: find
+  // the first contiguous run in `passageWords` whose per-word `keyFn(w.raw)` exactly matches
+  // `fromWords`', searching inside `preferredIndices` first (normally the quoted-phrase Text Match
+  // region — the part of the passage this question is already about) and falling back to the first
+  // occurrence anywhere in the passage if that search comes up empty. Returns the matched run's
+  // starting passage index, or -1 if nothing matches at all.
+  function examFindPhraseRunWithKey(fromWords, passageWords, preferredIndices, keyFn) {
+    if (!fromWords.length || !passageWords.length) return -1;
+    const fromKeys = fromWords.map(w => keyFn(w.raw));
+    const passageKeys = passageWords.map(w => keyFn(w.raw));
+    function findRun(startFrom, endExclusive) {
+      for (let j = startFrom; j + fromKeys.length <= endExclusive; j++) {
+        let ok = true;
+        for (let k = 0; k < fromKeys.length; k++) {
+          if (!fromKeys[k] || fromKeys[k] !== passageKeys[j + k]) { ok = false; break; }
+        }
+        if (ok) return j;
+      }
+      return -1;
+    }
+    if (preferredIndices && preferredIndices.size) {
+      const sorted = [...preferredIndices].sort((a, b) => a - b);
+      const found = findRun(sorted[0], sorted[sorted.length - 1] + 1);
+      if (found !== -1) return found;
+    }
+    return findRun(0, passageKeys.length);
+  }
+
+  // Locates where a selected answer's "before" phrase actually occurs in the passage, so the live
+  // edit preview replaces the right occurrence rather than any unrelated earlier word that happens
+  // to share the same text. Comparison is the same case-sensitive, punctuation-trimmed key as
+  // examFindTextMatches (examTextMatchKey) — an edit about a capitalization fix has to find the
+  // exact casing it's meant to change. Used for an arrow-shaped "before → after" edit
+  // (examParseOptionEdit) — see examFindOptionEditTargetLoose for the quoted-phrase fallback, which
+  // needs the opposite.
+  function examFindOptionEditTarget(fromWords, passageWords, preferredIndices) {
+    return examFindPhraseRunWithKey(fromWords, passageWords, preferredIndices, examTextMatchKey);
+  }
+
+  // The quoted-phrase fallback's own locator (examParseOptionEditFromQuoted) — same search, but
+  // case-INSENSITIVE (examNormalize). A category like "comma fix" quotes the passage's phrase back
+  // at face value, sometimes with its own "proper" capitalization even where the passage's actual
+  // text doesn't match it (e.g. a question elsewhere is independently asking the reader to fix
+  // that exact capitalization) — so pinning the search to the quote's own exact case can miss the
+  // passage entirely. The capitalization of what's actually inserted still comes from the
+  // option's own "after" text, untouched — only the SEARCH for where to put it loosens here.
+  function examFindOptionEditTargetLoose(fromWords, passageWords, preferredIndices) {
+    return examFindPhraseRunWithKey(fromWords, passageWords, preferredIndices, examNormalize);
+  }
+
+  // Finds every exact phrase the ACTIVE question shares with the passage and records which
+  // passage word indices to highlight (see examRenderPassageWords' use of
+  // examTextMatchPassageIndices) — the actual matching is examFindTextMatches, above. A question
+  // that quotes "Kamakura japan", for instance, gets that exact phrase found and highlighted
+  // wherever it appears in the passage. Gated by examTextMatchToggle alone, and — unlike Mark Up's
+  // own edits, below — intentionally scoped to whichever question is currently open: this is a
+  // "here's what THIS question is about" cue, not something meant to persist once you navigate
+  // away. Recomputed whenever the active question changes or the toggle changes (see
+  // examShowQuestion and the toggle's own listener); cleared when the toggle is off, there's no
+  // passage, or no question is active.
+  function examRefreshTextMatches() {
+    examTextMatchPassageIndices = new Set();
+    const q = examActiveQuestion();
+    if (q && examPassageWords.length && examTextMatchToggle.checked) {
+      // Matched against the passage as currently DISPLAYED (examDisplayedPassageWords), not its raw
+      // underlying text — a question can quote the passage in its already-Mark-Up-corrected form
+      // (see that function's own comment), and the highlight should track what's actually on screen.
+      examTextMatchPassageIndices = examFindTextMatches(q.words, examDisplayedPassageWords());
+    }
+    if (examPassageWords.length) examRenderPassageWords();
+  }
+
+  // Recomputes (or clears) ONE question's entry in examMarkupEdits — called whenever that
+  // question's selected answer changes (see the answer radio's own listener), so the live edit
+  // preview Mark Up mode shows is never more than one selection out of date. Unlike Text Match
+  // above, this is intentionally NOT scoped to the active question: it records the edit under the
+  // question's own index and leaves it there, which is what lets examRenderPassageWords keep
+  // showing it after navigating to a different question (see examMarkupEdits). The selected option
+  // is tried against four shapes in order — "before → after" (examParseOptionEdit) first, then the
+  // full-quoted-phrase fallback (examParseOptionEditFromQuoted) for a category like commas that
+  // gives the full corrected phrase instead of an arrow pair, then the single-quoted-word fallback
+  // (examParseOptionEditFromQuotedWord) for a category like capitalization that gives just the one
+  // corrected word, then the quoted-span fallback (examParseOptionEditFromQuotedSpan) for a category
+  // like a helping-verb grammar fix that gives a short multi-word fragment ("will meet") shorter
+  // than the whole quote but longer than one word; which one matched decides how "before" gets
+  // LOCATED in the passage too — exact-case (examFindOptionEditTarget) for an arrow edit, since
+  // that's usually a capitalization fix where case IS the point, or case-insensitive
+  // (examFindOptionEditTargetLoose) for any of the three quoted fallbacks, whose quote can carry its
+  // own "corrected" capitalization that the passage's actual (erroneous) text doesn't share. If NONE
+  // of the four shapes match, or "before" still can't be found with the same word count as "after",
+  // any previous entry for this question is removed instead — picking an answer that doesn't propose
+  // a recognizable edit, or deselecting one entirely, clears that question's own preview without
+  // touching any other question's. Locating "before" still prefers this question's own quoted-phrase
+  // match region (examFindTextMatches) as a hint for which occurrence of a repeated word is the
+  // relevant one — that lookup runs here regardless of whether examTextMatchToggle itself is
+  // checked, since the two toggles only share logic, not visibility. examRenderPassageWords itself
+  // only ever applies this map's entries while examMarkupToggle is checked, so this can be safely
+  // kept up to date even while Mark Up is off, ready to reappear the moment it's turned back on.
+  function examUpdateMarkupEditForQuestion(idx) {
+    examMarkupEdits.delete(idx);
+    const q = examQuestions[idx];
+    if (!q || q.selectedAnswer === -1 || !examPassageWords.length) return;
+    const opt = q.options[q.selectedAnswer];
+    if (!opt) return;
+    const arrowEdit = examParseOptionEdit(opt.raw);
+    const edit = arrowEdit
+      || examParseOptionEditFromQuoted(q.raw, opt.raw)
+      || examParseOptionEditFromQuotedWord(q.raw, opt.raw)
+      || examParseOptionEditFromQuotedSpan(q.raw, opt.raw);
+    if (!edit) return;
+    const fromWords = examBuildWords(edit.from);
+    const toWords = examBuildWords(edit.to);
+    if (!fromWords.length || fromWords.length !== toWords.length) return;
+    const quotedMatchRegion = examFindTextMatches(q.words, examPassageWords);
+    const locate = arrowEdit ? examFindOptionEditTarget : examFindOptionEditTargetLoose;
+    const start = locate(fromWords, examPassageWords, quotedMatchRegion);
+    if (start !== -1) examMarkupEdits.set(idx, { start: start, toWords: toWords.map(w => w.raw) });
+  }
+
+  // The "after" text from whichever recorded edit (examMarkupEdits, across ALL questions, not just
+  // the active one) currently covers passage word `i`, or null when none does — regardless of
+  // whether examMarkupToggle itself is on. Split out from examMarkupTextForIndex, below, so the PDF
+  // export's own passage section (examPassagePdfEntries) can show every selected answer's edit
+  // no matter whether Mark Up happened to be toggled on when Submit was clicked — the export is a
+  // record of the work actually done, not a snapshot of the screen at that moment.
+  function examMarkupTextForIndexAlways(i) {
+    for (const edit of examMarkupEdits.values()) {
+      const offset = i - edit.start;
+      if (offset >= 0 && offset < edit.toWords.length) return edit.toWords[offset];
+    }
+    return null;
+  }
+
+  // The display override for passage word `i` under Mark Up mode — null whenever examMarkupToggle
+  // itself is off. See examRenderPassageWords, the only caller.
+  function examMarkupTextForIndex(i) {
+    if (!examMarkupToggle.checked) return null;
+    return examMarkupTextForIndexAlways(i);
+  }
+
+  // The passage as it's currently DISPLAYED — each word swapped for its Mark Up "after" text
+  // wherever examMarkupTextForIndex covers it (from ANY question's answered edit, same as
+  // rendering), or left as the original word otherwise. Used only by examRefreshTextMatches, below:
+  // a later question can quote the passage in its already-corrected form (e.g. Question 8 quotes
+  // "...I will meet you..." once Question 7's "meeting → meet" fix has been picked), and that
+  // phrase should still highlight as one unbroken Text Match run rather than breaking at the one
+  // word Mark Up has visually replaced. examUpdateMarkupEditForQuestion deliberately does NOT use
+  // this — locating where an edit belongs has to search the passage's actual underlying text, never
+  // a possibly-already-edited stand-in for it.
+  //
+  // Each swapped-in entry also carries `edited: true` — see examFindTextMatches, which needs to
+  // know this to fix the "go to previous question, Text Match doesn't re-highlight" bug: a
+  // case-only Mark Up fix (a Capitals question's own "japan → Japan") changes what's on screen, but
+  // the question's own quote still shows the ORIGINAL wrong casing ("japan") by design — that's the
+  // whole premise of the category. Comparing case-sensitively (the right call for UNEDITED text —
+  // see examTextMatchKey's own comment) means the question's highlight of its own now-corrected
+  // word breaks the moment the reader answers it correctly, which they can't easily notice until
+  // they navigate away and back to recheck.
+  function examDisplayedPassageWords() {
+    return examPassageWords.map(function (w, i) {
+      const markupText = examMarkupTextForIndex(i);
+      return markupText !== null ? { raw: markupText, edited: true } : w;
+    });
+  }
+
+  // Builds the passage's word list once per load (called from examBeginQuestionSet, not from
+  // examShowQuestion) so reading progress and the open/collapsed state a reader chose aren't reset
+  // just from moving between questions — the same passage, and the same read-once-scored state,
+  // stays put across the whole set. Hidden entirely when this document had no detected passage.
+  // Renders with the same word-by-word .word spans as a question stem (see examRenderPassageWords)
+  // rather than plain paragraph text, since the passage is now playable through the shared engine
+  // exactly like one — see examPassagePlayBtn's click handler.
+  function examRenderPassage() {
+    // Every recorded Mark Up edit (examMarkupEdits) is a passage-word INDEX plus the question it
+    // came from — both meaningless once a new document (new passage, new question set) loads, so
+    // start clean rather than carrying stale indices into an unrelated passage. Text Match's own
+    // state needs no equivalent reset: it's recomputed fresh from the active question every time
+    // anyway (see examRefreshTextMatches), never left lingering between documents.
+    examMarkupEdits = new Map();
+    if (!examPassageText) {
+      examPassageCard.hidden = true;
+      examPassageWords = [];
+      examPassageParaTight = [];
+      examPassageSpans = [];
+      examPassageScored = false;
+      examPassageMode = null;
+      examPassageArea.innerHTML = '';
+      examPassageStatus.textContent = '';
+      return;
+    }
+    const builtPassage = examBuildPassageWords(examPassageText);
+    examPassageWords = builtPassage.words;
+    examPassageParaTight = builtPassage.paraTight;
+    examPassageScored = false;
+    examPassageMode = null;
+    examPassageStatus.textContent = '';
+    // A fresh document is the only place the word list itself actually changes shape/content —
+    // always rebuild the span DOM here explicitly, rather than relying on examRenderPassageWords'
+    // own length-based staleness check, since two different documents could coincidentally have
+    // the same word count (which would otherwise wrongly reuse stale spans with the old text).
+    examBuildPassageSpans();
+    examRenderPassageWords();
+    examPassageCard.hidden = false;
+  }
+
+  // Persistent word-span elements, parallel to examPassageWords — built once per document load
+  // (examBuildPassageSpans) and, other than that, never torn down just to reflect a status/
+  // pointer/mask change. See examRenderPassageWords: every per-tick render only touches the
+  // specific spans whose own visual state actually changed, so already-covered text never
+  // flickers as the reader progresses (rebuilding ~150 DOM nodes on every single word, the
+  // previous approach, forced a full repaint of the whole passage each time).
+  let examPassageSpans = [];
+
+  function examBuildPassageSpans() {
+    examPassageArea.innerHTML = '';
+    examPassageSpans = [];
+    // Words carry a `.para` index (see examBuildPassageWords) — group consecutive same-paragraph
+    // words into their own <p class="para-block"> the same way Read mode's renderWords() does,
+    // so the title and each story paragraph stay visually separate instead of running together.
+    let currentParaEl = null;
+    let currentParaIdx = null;
+    examPassageWords.forEach(w => {
+      if (w.para !== currentParaIdx) {
+        currentParaEl = document.createElement('p');
+        // A paragraph whose OWN trailing gap (examPassageParaTight[w.para]) is tight gets no extra
+        // block spacing after it — see examSplitParagraphsWithTightness for what sets this.
+        currentParaEl.className = 'para-block' + (examPassageParaTight[w.para] ? ' tight' : '');
+        examPassageArea.appendChild(currentParaEl);
+        currentParaIdx = w.para;
+      }
+      const span = document.createElement('span');
+      span.textContent = w.raw;
+      (currentParaEl || examPassageArea).appendChild(span);
+      examPassageSpans.push(span);
+    });
+  }
+
+  // The lightweight per-tick render, called repeatedly while the passage is being played (see
+  // examEngineRenderCallback) — updates the EXISTING spans built by examBuildPassageSpans to
+  // reflect current status/pointer/mask state, touching a span's class/title only when its own
+  // desired value actually differs from what's already there. A span whose word hasn't changed —
+  // the overwhelming majority of a long passage on any given tick — is never written to at all.
+  function examRenderPassageWords() {
+    if (examPassageSpans.length !== examPassageWords.length) examBuildPassageSpans(); // defensive fallback
+    const mask = examComputePassageMask(examPassageSpans);
+    examPassageWords.forEach((w, i) => {
+      const span = examPassageSpans[i];
+      if (!span) return;
+      const isCurrent = examEngineTarget === 'passage' && i === examEnginePointer;
+      // No click-for-help in Speaker mode — the device is already reading everything aloud, so
+      // there's no STT-driven "stuck word" for a click to help with (see examEngineUsingSpeaker).
+      const isHelpClickable = isCurrent && examEngineListening && !examEngineUsingSpeaker && w.status === 'pending';
+      let desiredClass = 'word ' + w.status;
+      if (isCurrent) desiredClass += ' current-target';
+      if (isHelpClickable) desiredClass += ' help-clickable';
+      if (examTextMatchPassageIndices.has(i)) desiredClass += ' text-match';
+      // Mark Up's live edit preview (see examMarkupEdits/examMarkupTextForIndex): shows whichever
+      // recorded edit — from ANY question, not just the active one — covers this index, so a fix
+      // marked up on an earlier question stays visible after navigating away from it. Reverts
+      // automatically the moment nothing covers this index anymore (that question's answer
+      // changed, Mark Up turned off), since every word's desired text is recomputed from scratch
+      // on every render, never left stale.
+      const markupText = examMarkupTextForIndex(i);
+      const isMarkupEdit = markupText !== null;
+      if (isMarkupEdit) desiredClass += ' markup-edit';
+      if (mask[i]) desiredClass += ' masked';
+      if (span.className !== desiredClass) span.className = desiredClass;
+      const desiredText = isMarkupEdit ? markupText : w.raw;
+      if (span.textContent !== desiredText) span.textContent = desiredText;
+      const desiredTitle = isHelpClickable ? 'Click for help with this word' : '';
+      if (span.title !== desiredTitle) span.title = desiredTitle;
+    });
+  }
+
+  // Single delegated click handler for help-on-click (see examPassagePlayBtn's info tip) — bound
+  // once to the passage's container rather than per-span, since spans are now long-lived and
+  // whether a given span is "clickable" changes constantly as the pointer moves; delegation means
+  // there's never a per-span listener to add or remove as that eligibility shifts.
+  examPassageArea.addEventListener('click', function (event) {
+    const span = event.target.closest('.word.help-clickable');
+    if (span) examRequestHelpForWord();
+  });
+
+  // Each word is rendered as its own <span> with no whitespace text node between them (spacing is
+  // purely visual, via CSS margin — see .word) — so the browser's default copy of a selection
+  // across multiple words runs them all together with nothing separating them. Rebuild the
+  // clipboard text instead: every selected word's own text joined with a real space, grouped back
+  // into its original paragraphs (blank line between them) so a highlight-and-paste out of the
+  // passage reads the way the passage itself does. A masked word can't be dragged into a selection
+  // in the first place (.word.masked has user-select:none), so an in-progress cover never leaks
+  // into a copy. Scoped to selections inside the passage only — listening on `document` (rather
+  // than examPassageArea itself) because a copy event targets whatever's focused, not necessarily
+  // a descendant of the selected text, so a listener on the passage area wouldn't reliably see it;
+  // every other copy on the page, including Read mode's own reading area, is left untouched.
+  document.addEventListener('copy', function (event) {
+    const selection = document.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    const range = selection.getRangeAt(0);
+    if (!examPassageArea.contains(range.commonAncestorContainer)) return;
+
+    const lines = [];
+    examPassageArea.querySelectorAll('p.para-block').forEach(function (p) {
+      const selectedWords = [...p.querySelectorAll('.word')].filter(function (span) { return selection.containsNode(span, true); });
+      if (selectedWords.length) lines.push(selectedWords.map(function (span) { return span.textContent; }).join(' '));
+    });
+    if (!lines.length) return;
+    event.clipboardData.setData('text/plain', lines.join('\n\n'));
+    event.preventDefault();
+  });
+
+  // "Current position" for the passage's own cover mask: the live engine pointer while the
+  // passage is actually what's being read, or — since examEnginePointer is shared across
+  // question/option/passage and means nothing for the passage the rest of the time — the first
+  // still-pending word otherwise (same resume point examEngineResumePassage would pick; the
+  // passage's own progress persists even while some other question/option is what's listening).
+  function examPassageCoverPointer() {
+    if (examEngineTarget === 'passage') return examEnginePointer;
+    const idx = examPassageWords.findIndex(w => w.status === 'pending');
+    return idx < 0 ? examPassageWords.length : idx;
+  }
+
+  // Ported from Read mode's own "Cover unread text" scaffolding (see applyCoverMask) for the exam
+  // passage specifically — same words-ahead/lines-below reveal logic, using each span's real
+  // offsetTop to find true visual line boundaries — but kept fully independent: its own toggle/
+  // reveal DOM refs, its own --exam-mask-color CSS variable (see examApplyPassageMaskColor), and
+  // its own pointer source (examPassageCoverPointer) — nothing here reads, writes, or otherwise
+  // touches Read mode's own coverToggle/pointer/words. Applies identically in Speaker mode and
+  // Read/listen mode, since it's a purely visual reveal-ahead aid either way.
+  //
+  // Pure computation, no DOM mutation — returns which indices SHOULD be masked right now, so
+  // examRenderPassageWords can fold that into each span's one combined desired-class string and
+  // only touch a span whose full visual state (status, current, help-clickable, OR masked) has
+  // actually changed. Masking never affects layout (it's a background/color swap, not
+  // display:none), so reading spans[i].offsetTop here is safe regardless of current mask state.
+  function examComputePassageMask(spans) {
+    const mask = new Array(spans.length).fill(false);
+    if (!examPassageCoverToggle.checked || !spans.length) return mask;
+    const pointer = examPassageCoverPointer();
+    if (pointer >= spans.length) return mask;
+
+    const revealWords = parseInt(examPassageRevealWordsSelect.value, 10) || 0;
+    const revealLines = parseInt(examPassageRevealLinesSelect.value, 10) || 0;
+
+    const currentTop = spans[pointer].offsetTop;
+
+    let sameLineCount = 0;
+    let i = pointer + 1;
+    while (i < spans.length && spans[i].offsetTop <= currentTop + 2) {
+      sameLineCount++;
+      i++;
+    }
+
+    const revealOnThisLine = Math.min(revealWords, sameLineCount);
+    for (let k = pointer + 1; k < pointer + 1 + sameLineCount; k++) {
+      if (k - (pointer + 1) >= revealOnThisLine) mask[k] = true;
+    }
+
+    const spillover = Math.max(0, revealWords - sameLineCount);
+
+    let lineOffset = 1;
+    let lastTop = i < spans.length ? spans[i].offsetTop : null;
+    let wordsIntoThisLine = 0;
+
+    for (; i < spans.length; i++) {
+      const top = spans[i].offsetTop;
+      if (top > lastTop + 2) {
+        lineOffset += 1;
+        lastTop = top;
+        wordsIntoThisLine = 0;
+      }
+      wordsIntoThisLine += 1;
+      const revealedBySpillover = lineOffset === 1 && wordsIntoThisLine <= spillover;
+      const revealedByLineCount = lineOffset <= revealLines;
+      if (!revealedBySpillover && !revealedByLineCount) mask[i] = true;
+    }
+    return mask;
+  }
+
+  function examApplyPassageMaskColor(color) {
+    document.documentElement.style.setProperty('--exam-mask-color', color);
+    examPassageMaskColorPicker.value = color;
+  }
+
+  // Mirrors examOnQuestionDone — the passage isn't scored/exported like a question (it's reference
+  // material, not part of the graded set), so this just updates the status line with the same
+  // "click to hear a word" hint Read mode gives once a Read-mode pass finishes.
+  function examOnPassageDone() {
+    examPassageScored = true;
+    examPassageStatus.textContent = examPassageMode === 'speaker' ? '' : EXAM_QUESTION_READ_HINT;
+  }
+
+  // Clears the passage back to its untouched state — the explicit, always-available way to get a
+  // full restart now that Play itself resumes from wherever a paused read left off (see
+  // examEngineResumePassage) instead of always rewinding to the start. Every touch of the shared
+  // engine's OWN globals (pointer, helper timer) is guarded behind "is the engine actually
+  // targeting the passage right now", so pressing Reset while a QUESTION or OPTION happens to be
+  // mid-read elsewhere can't corrupt that unrelated read. examEngineStop() — called first, only
+  // when the passage itself is what's listening — is synchronous in every way that matters here:
+  // Speaker mode clears examSpeakerUtterance before cancelling, so any onend/onerror the browser
+  // still fires after that is already a no-op (see the `examSpeakerUtterance !== utter` guard in
+  // examEngineStartSpeaker); Read/listen mode's recognition.stop() can likewise still deliver one
+  // last buffered onresult after this returns, but that's the exact same window every OTHER
+  // examEngineSwitchTo-driven mode switch has always had — not a new risk introduced by Reset.
+  function examResetPassage() {
+    if (examEngineListening && examEngineTarget === 'passage') examEngineStop();
+    examPassageWords.forEach(function (w) {
+      w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null;
+    });
+    if (examEngineTarget === 'passage') {
+      examClearHelperTimer();
+      examEnginePointer = 0;
+    }
+    examPassageScored = false;
+    examPassageMode = null;
+    examPassageStatus.textContent = '';
+    examRenderPassageWords();
   }
 
   // Builds the whole set from parsed {stem, options} entries and drops straight into question 1,
   // ready to read — loading a set doesn't need a separate "start" click. If nothing usable was
   // found at all, falls back to the editable check-and-fix screen for manual single-question entry.
-  function examBeginQuestionSet(parsedList) {
+  // `passageText` (possibly '') is set and rendered unconditionally, even on that fallback path —
+  // if the reader then fixes up a question by hand, the passage detected alongside it is still
+  // there once they reach the work card.
+  function examBeginQuestionSet(parsedList, passageText, imagesFlat) {
+    examPassageText = passageText || '';
+    examRenderPassage();
     const valid = (parsedList || []).filter(p => p.stem && p.options && p.options.length >= 2);
     if (!valid.length) {
       examOpenEditStage('', []);
       examPdfStatus.textContent = "Couldn't find a usable question — add one below.";
       return;
     }
-    examQuestions = valid.map(p => examBuildQuestionEntry(p.stem, p.options));
+    // Each parsed question carries plain integer indices (see examSplitIntoQuestions'
+    // examConsumeImageSentinel) into the flat, document-wide `imagesFlat` array extracted
+    // alongside the text (examExtractPdfText) — resolve those back into the actual image objects
+    // here, once, rather than threading the flat array any further than this. A missing/bad index
+    // is simply dropped rather than throwing, since nothing about parsing here is ever guaranteed.
+    examQuestions = valid.map(p => examBuildQuestionEntry(
+      p.stem, p.options, (p.images || []).map(idx => (imagesFlat || [])[idx]).filter(Boolean)
+    ));
     examEditCard.hidden = true;
     examWorkCard.hidden = false;
     examShowQuestion(0);
@@ -3314,14 +4735,17 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   // Applies the check-and-fix screen's fields: either creating question 1 of a brand-new set
   // (nothing loaded yet), or replacing the question at examQuestionIndex in an existing set —
-  // fixing a parsing mistake never disturbs the other questions around it.
+  // fixing a parsing mistake never disturbs the other questions around it. Any images already
+  // attached to the question being replaced (from the original PDF extraction) are carried over
+  // unchanged — this screen only edits text, so there's nothing here that should ever drop them.
   function examCommitEditedQuestion() {
     const stem = examQuestionInput.value.trim();
     const opts = examOptionTexts.map(t => t.trim()).filter(Boolean);
     if (!stem) { examPdfStatus.textContent = 'Add the question text before continuing.'; return; }
     if (opts.length < 2) { examPdfStatus.textContent = 'Add at least two answer choices before continuing.'; return; }
     const targetIdx = examQuestions.length ? examQuestionIndex : 0;
-    examQuestions[targetIdx] = examBuildQuestionEntry(stem, opts);
+    const prevImages = (examQuestions[targetIdx] && examQuestions[targetIdx].images) || [];
+    examQuestions[targetIdx] = examBuildQuestionEntry(stem, opts, prevImages);
     examEditCard.hidden = true;
     examWorkCard.hidden = false;
     examShowQuestion(targetIdx);
@@ -3354,11 +4778,46 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     });
   }
 
+  // Renders this question's attached picture/table/chart crops (q.images — see
+  // examDetectAndInsertPageImages and examBuildQuestionEntry), between the question text and the
+  // notes/answer-choices area, exactly where the user asked for them to show up. Only called when
+  // the active question itself changes (examShowQuestion) rather than from examRenderQuestionArea
+  // (which also re-runs on every reading-highlight update) — the images never change mid-question,
+  // so there's nothing to gain from rebuilding this on every word.
+  function examRenderQuestionImages() {
+    examQuestionImagesEl.innerHTML = '';
+    const q = examActiveQuestion();
+    const imgs = (q && q.images) || [];
+    examQuestionImagesEl.hidden = !imgs.length;
+    imgs.forEach(function (img) {
+      const el = document.createElement('img');
+      el.src = img.data;
+      el.className = 'exam-question-image';
+      el.alt = 'Image for this question';
+      examQuestionImagesEl.appendChild(el);
+    });
+  }
+
   function examRenderQuestionArea() {
     examQuestionArea.innerHTML = '';
     const q = examActiveQuestion();
     if (!q) return;
+    // Same <p class="para-block"> grouping as the passage (see examBuildPassageSpans) — a plain
+    // single-line stem just gets one paragraph (no visible change), while a stem built from
+    // several original source lines (a category label, a quoted line, an instruction) keeps them
+    // on separate lines instead of running them all together. This area fully rebuilds on every
+    // call already (stems are short, unlike the passage, so that's never been a flicker concern),
+    // so no persistent-span bookkeeping is needed here the way the passage's own renderer needs it.
+    let currentParaEl = null;
+    let currentParaIdx = null;
+    const paraTight = q.stemParaTight || [];
     q.words.forEach((w, i) => {
+      if (w.para !== currentParaIdx) {
+        currentParaEl = document.createElement('p');
+        currentParaEl.className = 'para-block' + (paraTight[w.para] ? ' tight' : '');
+        examQuestionArea.appendChild(currentParaEl);
+        currentParaIdx = w.para;
+      }
       const span = document.createElement('span');
       span.className = 'word ' + w.status;
       const isCurrent = examEngineTarget === 'question' && i === examEnginePointer;
@@ -3371,39 +4830,77 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         span.addEventListener('click', function () { examRequestHelpForWord(); });
       }
       span.textContent = w.raw;
-      examQuestionArea.appendChild(span);
+      (currentParaEl || examQuestionArea).appendChild(span);
     });
   }
 
-  // Normalized set of words found in a notes string — shared by the live on-screen underlining
+  // Case-PRESERVING counterpart to examNormalize, used only for the notes-keyword underline
+  // feature below (examKeywordMatches) — never for anything that scores against speech
+  // recognition (examNormalize/.norm stay case-folded for that, since "Kamakura" spoken aloud
+  // should still match regardless of case; changing those would silently break scoring). This one
+  // is specifically about catching a CHARACTER-EXACT match, punctuation included: typing "Japan"
+  // in the notes box should underline only "Japan" in an answer choice, never "japan" — and typing
+  // "Kamakura," (with the trailing comma, e.g. copied from a comma-fix option) should underline
+  // only an option's own "Kamakura,", never a bare "Kamakura" that happens to sit next to a comma
+  // in a different option. No punctuation is stripped here (unlike examNormalize) — only
+  // surrounding whitespace is trimmed, since the raw option word already carries its own attached
+  // punctuation (e.g. "Kamakura," is one token, not "Kamakura" + ",").
+  function examKeywordKey(raw) {
+    return (raw || '').trim();
+  }
+
+  // Case-sensitive set of words found in a notes string — shared by the live on-screen underlining
   // (against the currently-open question's notes textarea) and the PDF export (against each
   // question's own saved `notes`, since export walks every question, not just the visible one).
   function examKeywordSetFromNotes(notesText) {
     const set = new Set();
     (notesText || '').split(/\s+/).forEach(function (t) {
-      const n = normalize(t);
-      if (n && n.length > 1) set.add(n);
+      const n = examKeywordKey(t);
+      // Only the two actual stray-filler WORDS — "a" and "i" (the indefinite article and the
+      // pronoun, typed in either case) — are too noisy to flag everywhere they appear, so those stay
+      // excluded. Every other single letter ("C", "D", "c", "d", "b", "x", ...) is commonly a
+      // deliberate point/segment/variable label (e.g. geometry worksheets: "From C - D", or typed in
+      // notes as lowercase "c d" relying on case-insensitive matching to find "C"/"D" in an answer
+      // choice — see examKeywordMatches), not noise, so it's kept. This check is deliberately
+      // case-insensitive regardless of the "Notes Case Sensitive" checkbox — whether "a"/"i" is
+      // noise doesn't depend on how it was capitalized, only on what word it is. A single DIGIT
+      // ("5") or a single SYMBOL ("/") is exact, meaningful content on its own too, so both are also
+      // kept even at length 1.
+      if (n && (n.length > 1 || !/^[ai]$/i.test(n))) set.add(n);
     });
     return set;
   }
 
-  // Normalized set of words currently in the notes box, so any matching word inside an answer
+  // Case-sensitive set of words currently in the notes box, so any matching word inside an answer
   // choice can be underlined as a "you already flagged this" cue.
   function examGetNotesKeywordSet() {
     return examKeywordSetFromNotes(examNotesInput ? examNotesInput.value : '');
   }
 
-  // Whether a normalized word should count as "flagged in the notes" — an exact match always
-  // counts (any length), and beyond that a same-stem partial match counts too (e.g. notes
-  // "objects" should highlight an option's "object", and vice versa), so long as both sides are
-  // real words (3+ letters) rather than short fragments that would match almost anything.
-  function examKeywordMatches(norm, keywordSet) {
-    if (!norm || !keywordSet || !keywordSet.size) return false;
-    if (keywordSet.has(norm)) return true;
-    if (norm.length < 3) return false;
-    for (const kw of keywordSet) {
-      if (kw.length < 3) continue;
-      if (norm.includes(kw) || kw.includes(norm)) return true;
+  // Whether a word (passed in via its case-preserving examKeywordKey, NOT its case-folded .norm —
+  // see every call site below) should count as "flagged in the notes" — an EXACT match, modulo
+  // case. Deliberately no same-stem/substring fallback (an earlier version underlined "meeting"
+  // for notes text "meet" since one contains the other) — typing "meet" in the notes box should
+  // underline only an option's own exact "meet", never "meeting", "met", or anything else that
+  // merely shares those letters.
+  //
+  // Case handling is controlled by the "Notes Case Sensitive" checkbox (examNotesCaseSensitiveToggle,
+  // off/unchecked by default): unchecked means case-insensitive — "c" in the notes also flags "C" in
+  // an answer choice — which is the friendlier default for most notes. Checked restores the original
+  // exact, same-case-only comparison. Read directly off the checkbox (like examMarkupToggle.checked
+  // elsewhere) rather than mirrored into a separate variable, so it can never drift out of sync with
+  // what's on screen.
+  function examKeywordMatches(key, keywordSet) {
+    if (!key || !keywordSet || !keywordSet.size) return false;
+    if (keywordSet.has(key)) return true;
+    if (examNotesCaseSensitiveToggle && examNotesCaseSensitiveToggle.checked) return false;
+    // Case-insensitive fallback: keywordSet keeps its members' original case (so a same-case exact
+    // match via the checked path above still works unmodified), so this compares lowercased forms
+    // one by one instead of maintaining a second lowercase-keyed set. These sets are always small
+    // (the words in one notes box), so a linear scan here is negligible.
+    const lower = key.toLowerCase();
+    for (const k of keywordSet) {
+      if (k.toLowerCase() === lower) return true;
     }
     return false;
   }
@@ -3433,21 +4930,59 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       playBtn.addEventListener('click', function () { examToggleOptionPlay(idx); });
       row.appendChild(playBtn);
 
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = 'examAnswer';
-      radio.id = 'examOptRadio' + idx;
-      radio.disabled = !allScored;
-      radio.checked = (q.selectedAnswer === idx);
-      radio.addEventListener('change', function () {
-        q.selectedAnswer = idx;
-        examAnswerStatus.textContent = 'Answer selected: ' + opt.raw;
-        examUpdateSubmitVisibility();
-        examUpdateNavGating();
-      });
+      // Multi-select ("select all N that apply") questions get an independent checkbox per option
+      // instead of the usual single-answer radio group — see examParseMultiSelectRequirement /
+      // q.multiSelect. Everything else about the row (play button, masking, keyword match, scored
+      // styling) is identical either way.
+      const picker = document.createElement('input');
+      if (q.multiSelect) {
+        picker.type = 'checkbox';
+        picker.id = 'examOptCheck' + idx;
+        const isChecked = q.selectedAnswers.indexOf(idx) !== -1;
+        picker.checked = isChecked;
+        // Once the required count is already checked elsewhere, lock the remaining UNchecked boxes
+        // so the reader can't go over — but never lock a box that's already checked, so unchecking
+        // it to free up a slot always stays possible. When the stem didn't state a parseable count,
+        // there's nothing to cap, so only the "every option has been read" gate applies.
+        const atRequiredCount = q.multiSelect.required != null && q.selectedAnswers.length >= q.multiSelect.required;
+        picker.disabled = !allScored || (!isChecked && atRequiredCount);
+        picker.addEventListener('change', function () {
+          const pos = q.selectedAnswers.indexOf(idx);
+          if (picker.checked && pos === -1) q.selectedAnswers.push(idx);
+          else if (!picker.checked && pos !== -1) q.selectedAnswers.splice(pos, 1);
+          const required = q.multiSelect.required;
+          examAnswerStatus.textContent = required != null
+            ? (q.selectedAnswers.length + ' of ' + required + ' selected' + (q.selectedAnswers.length === required ? ' — ready to continue.' : ''))
+            : (q.selectedAnswers.length + ' selected' + (q.selectedAnswers.length > 0 ? ' — ready to continue whenever you\'re done.' : ''));
+          examUpdateSubmitVisibility();
+          examUpdateNavGating();
+          // Re-render so sibling checkboxes pick up the fresh at-required-count disabled state —
+          // the same pattern examNotesCaseSensitiveToggle's own change handler uses.
+          examRenderOptionsList();
+        });
+      } else {
+        picker.type = 'radio';
+        picker.name = 'examAnswer';
+        picker.id = 'examOptRadio' + idx;
+        picker.disabled = !allScored;
+        picker.checked = (q.selectedAnswer === idx);
+        picker.addEventListener('change', function () {
+          q.selectedAnswer = idx;
+          examAnswerStatus.textContent = 'Answer selected: ' + opt.raw;
+          examUpdateSubmitVisibility();
+          examUpdateNavGating();
+          // Picking (or switching) this question's answer changes what Mark Up's live edit preview
+          // should show for THIS question specifically — examQuestionIndex, since `q` here is
+          // always the currently active question (examRenderOptionsList only ever renders its
+          // options) — without disturbing any other question's own recorded edit. A no-op when the
+          // selected option isn't shaped like an edit; see examUpdateMarkupEditForQuestion.
+          examUpdateMarkupEditForQuestion(examQuestionIndex);
+          examRenderPassageWords();
+        });
+      }
 
       const textWrap = document.createElement('label');
-      textWrap.setAttribute('for', radio.id);
+      textWrap.setAttribute('for', picker.id);
       textWrap.style.flex = '1';
 
       const textSpan = document.createElement('span');
@@ -3461,7 +4996,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         const isCurrentWord = isListeningHere && wi === examEnginePointer;
         if (isCurrentWord) wSpan.classList.add('current-target');
         if (!opt.revealed) wSpan.classList.add('masked');
-        if (examKeywordMatches(w.norm, notesKeywordSet)) wSpan.classList.add('keyword-match');
+        if (examKeywordMatches(examKeywordKey(w.raw), notesKeywordSet)) wSpan.classList.add('keyword-match');
         if (isCurrentWord && !examEngineUsingSpeaker && w.status === 'pending') {
           wSpan.classList.add('help-clickable');
           wSpan.title = 'Click for help with this word';
@@ -3472,7 +5007,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       });
       textWrap.appendChild(textSpan);
 
-      row.appendChild(radio);
+      row.appendChild(picker);
       row.appendChild(textWrap);
       if (isListeningHere) row.classList.add('exam-active');
       if (opt.scored) row.classList.add('exam-scored');
@@ -3484,6 +5019,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examEngineRenderCallback() {
     if (examEngineTarget === 'question') examRenderQuestionArea();
     else if (examEngineTarget === 'option') examRenderOptionsList();
+    else if (examEngineTarget === 'passage') examRenderPassageWords();
   }
 
   function examUpdatePlayButtons() {
@@ -3496,6 +5032,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examQuestionPlayBtn.title = label;
     } else if (examEngineTarget === 'option') {
       examRenderOptionsList();
+    } else if (examEngineTarget === 'passage') {
+      const listening = examEngineListening;
+      examPassagePlayBtn.classList.toggle('listening', listening);
+      examPassagePlayIcon.textContent = listening ? '■' : '▶';
+      const label = listening ? 'Stop' : 'Play — read the passage aloud';
+      examPassagePlayBtn.setAttribute('aria-label', label);
+      examPassagePlayBtn.title = label;
     }
   }
 
@@ -3604,7 +5147,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
 
   function examProcessWord(rawWord) {
-    const norm = normalize(rawWord);
+    const norm = examNormalize(rawWord);
     if (!norm || examEnginePointer >= examEngineWords.length) return;
 
     // A skipped word is currently "offered" for correction — if this is the reader repeating it
@@ -3698,6 +5241,33 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examEngineLoad(target, wordsArrRef, onDone);
   }
 
+  // Resume-aware counterpart to examEngineSwitchTo, scoped to the passage only: picking Play back
+  // up after Stop continues from wherever reading left off instead of rewinding every word back to
+  // 'pending' the way examEngineLoad (used by every other examEngineSwitchTo caller, including the
+  // question stem and every answer option) always does. Word status/attempts/help state are left
+  // exactly as they were for anything already resolved; only the engine's own target/pointer move
+  // to the first still-pending word. If nothing is pending — the passage was already read all the
+  // way through and Play was pressed again — there's nothing left to resume, so it starts over from
+  // the beginning instead of silently doing nothing; the dedicated Reset button (examResetPassage)
+  // is the explicit way to force that same full restart without first finishing a read.
+  function examEngineResumePassage(onDone) {
+    if (examEngineListening) examEngineStop();
+    examClearHelperTimer();
+    examEngineTarget = 'passage';
+    examEngineWords = examPassageWords;
+    let resumeIdx = examPassageWords.findIndex(w => w.status === 'pending');
+    if (resumeIdx < 0) resumeIdx = 0; // fully read already — nothing pending left, so start over
+    if (resumeIdx === 0) {
+      // Either a genuinely fresh, never-played passage (already all-pending — this is a no-op), or
+      // the "everything already read, restart from scratch" case above — either way, word 0 being
+      // the resume point means there's no partial progress worth preserving.
+      examPassageWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; });
+    }
+    examEnginePointer = resumeIdx;
+    examEngineOnDone = onDone;
+    examEngineCorrectionWord = null;
+  }
+
   // examEngineListening flips true here — synchronously, the moment Play is pressed — rather than
   // waiting for the recognizer's own async onstart event. onstart can lag the click by a
   // noticeable moment (mic permission/audio-pipeline setup), and until this flips, the current
@@ -3739,6 +5309,15 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examEngineStartSpeaker() {
     if (!examEngineWords.length) return;
     const wordsRef = examEngineWords;
+    // Speak only from wherever the engine's pointer currently sits, not always from the top. For
+    // the question stem and every answer option this is always 0 (examEngineLoad — used by their
+    // only path in here, examEngineSwitchTo — unconditionally rewinds the pointer first), so
+    // remainingWords is always the full array for them: a provable no-op. The passage is the one
+    // caller that can arrive here with a non-zero pointer (see examEngineResumePassage), and for it
+    // this is what makes Speaker-mode resume actually skip the audio already heard, not just the
+    // on-screen highlight.
+    const startIdx = examEnginePointer;
+    const remainingWords = wordsRef.slice(startIdx);
     examEngineUserStopped = false;
     examEngineListening = true;
     examEngineJustStarted = false;
@@ -3753,7 +5332,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examClearSpeakerTimers();
     window.speechSynthesis.cancel();
     window.speechSynthesis.resume();
-    const fullText = wordsRef.map(function (w) { return w.raw; }).join(' ');
+
+    if (examNaturalLanguageMode) {
+      examEngineStartSpeakerNatural(wordsRef, startIdx, remainingWords);
+      return;
+    }
+
+    const fullText = remainingWords.map(function (w) { return w.raw; }).join(' ');
     const spokenText = ttsPronounceable(fullText);
     const utter = new SpeechSynthesisUtterance(spokenText);
     const voice = getSelectedVoice();
@@ -3799,7 +5384,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     // ~2.5 words/sec is already a slow speaking pace; tripling that estimate and scaling by rate
     // gives a generous ceiling that's never hit during normal reading, only when the browser has
     // truly gone silent.
-    const estimatedMs = Math.round(Math.max(4000, (wordsRef.length / 2.5 / rate) * 1000 * 3));
+    const estimatedMs = Math.round(Math.max(4000, (remainingWords.length / 2.5 / rate) * 1000 * 3));
     examSpeakerHardWatchdog = setTimeout(function () {
       if (examSpeakerUtterance !== utter) return;
       try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
@@ -3816,9 +5401,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       for (let i = wordStarts.length - 1; i >= 0; i--) {
         if (event.charIndex >= wordStarts[i]) { idx = i; break; }
       }
-      if (idx < 0 || idx >= wordsRef.length) return;
-      if (wordsRef[idx].status === 'pending') wordsRef[idx].status = 'correct';
-      examEnginePointer = Math.min(idx + 1, wordsRef.length);
+      if (idx < 0 || idx >= remainingWords.length) return;
+      const globalIdx = startIdx + idx; // wordsRef/examEnginePointer are always indexed against the FULL array
+      if (wordsRef[globalIdx].status === 'pending') wordsRef[globalIdx].status = 'correct';
+      examEnginePointer = Math.min(globalIdx + 1, wordsRef.length);
       examEngineRenderCallback();
     };
     utter.onend = function () {
@@ -3853,11 +5439,172 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   function examEngineStopSpeaker() {
     examSpeakerUtterance = null;
+    examNaturalSpeakSession = null; // invalidates any pending between-chunk setTimeout too
     examClearSpeakerTimers();
     if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
     examEngineListening = false;
     examUpdatePlayButtons();
     examEngineRenderCallback();
+  }
+
+  // ---- Natural Language mode's own chunked playback (examNaturalLanguageToggle) ----
+  // Phrase boundaries default to a plain 2-3 word / punctuation rule, but when the "compromise" NLP
+  // library (loaded via <script> tag, see the bottom of <body>) is available, examComputePhraseHints
+  // runs it once per speak and tags each word with two soft hints:
+  //   - naturalNoBreakAfter: this word is inside a multi-word noun or verb phrase ("the lazy dog",
+  //     "is running") — don't end a phrase between it and the next word.
+  //   - naturalPreferChunkStart: this word is a conjunction ("and", "but") or preposition ("in",
+  //     "of") — prefer starting a fresh phrase here rather than trailing it onto the previous one.
+  // If the library never loaded (offline, blocked, etc.), every word's hints stay false and the
+  // chunker falls back to the plain length/punctuation rule. A self-contained exam-only pass — does
+  // not call or share any state with Read mode's own, separate phrase chunker.
+  function examFindWordSpan(wordsArr, phraseWords, searchFrom) {
+    for (let i = searchFrom; i <= wordsArr.length - phraseWords.length; i++) {
+      let ok = true;
+      for (let k = 0; k < phraseWords.length; k++) {
+        if (examNormalize(wordsArr[i + k].raw) !== phraseWords[k]) { ok = false; break; }
+      }
+      if (ok) return i;
+    }
+    return -1;
+  }
+
+  function examComputePhraseHints(wordsArr) {
+    wordsArr.forEach(function (w) { w.naturalNoBreakAfter = false; w.naturalPreferChunkStart = false; });
+    if (typeof nlp === 'undefined') return; // NLP library not loaded — plain rule applies to every word
+    try {
+      const text = wordsArr.map(function (w) { return w.raw; }).join(' ');
+      const doc = nlp(text);
+
+      [doc.nouns(), doc.verbs()].forEach(function (matchSet) {
+        let cursor = 0;
+        matchSet.json().forEach(function (m) {
+          const phraseWords = (m.text || '').split(/\s+/).map(examNormalize).filter(Boolean);
+          if (phraseWords.length < 2) return;
+          const at = examFindWordSpan(wordsArr, phraseWords, cursor);
+          if (at === -1) return;
+          for (let k = at; k < at + phraseWords.length - 1; k++) wordsArr[k].naturalNoBreakAfter = true;
+          cursor = at + phraseWords.length;
+        });
+      });
+
+      [doc.conjunctions(), doc.prepositions()].forEach(function (matchSet) {
+        matchSet.json().forEach(function (m) {
+          const norm = examNormalize(m.text || '');
+          if (!norm) return;
+          wordsArr.forEach(function (w) { if (examNormalize(w.raw) === norm) w.naturalPreferChunkStart = true; });
+        });
+      });
+    } catch (e) { /* NLP hinting unavailable this session — chunker falls back to the plain rule */ }
+  }
+
+  function examBuildPhraseChunks(wordsArr) {
+    const chunks = [];
+    const n = wordsArr.length;
+    const MAX_CHUNK = 4; // a hard ceiling even when a glued phrase would otherwise run longer
+    let i = 0;
+    while (i < n) {
+      let end = i + 1;
+      while (end < n && (end - i) < MAX_CHUNK) {
+        const last = wordsArr[end - 1];
+        if (/[.,;:!?]$/.test(last.raw)) break;                      // punctuation always ends the phrase
+        if (last.naturalNoBreakAfter) { end++; continue; }           // mid noun/verb phrase — keep going
+        const next = wordsArr[end];
+        if ((end - i) >= 2 && next.naturalPreferChunkStart) break;   // let a conjunction/preposition start fresh
+        if ((end - i) >= 3) break;                                   // default target: 2-3 words
+        end++;
+      }
+      chunks.push({ start: i, end: end });
+      i = end;
+    }
+    return chunks;
+  }
+
+  // Speaks `remainingWords` (a slice of `wordsRef` starting at `startIdx`, exactly as the plain path
+  // receives it) as a sequence of short phrase utterances instead of one continuous one, pausing
+  // EXAM_NATURAL_CHUNK_PAUSE_MS between each. Reuses the plain path's own two Chrome stuck-queue
+  // mitigations (see its own comment) per chunk rather than once for the whole text — appropriate
+  // since each chunk is short, so the per-chunk ceiling stays small and forward progress is never
+  // more than one short phrase away even in the worst case. Falls through to examEngineSpeakerFinish
+  // exactly like the plain path once every chunk has played.
+  function examEngineStartSpeakerNatural(wordsRef, startIdx, remainingWords) {
+    examComputePhraseHints(remainingWords);
+    const chunks = examBuildPhraseChunks(remainingWords);
+    const session = {};
+    examNaturalSpeakSession = session;
+    const rate = (examSpeakerRate || 1) * EXAM_SPEAKER_RATE_SCALE;
+    const voice = getSelectedVoice();
+
+    function speakChunk(chunkIdx) {
+      if (examNaturalSpeakSession !== session) return; // Stop was pressed, or a newer play superseded this
+      if (chunkIdx >= chunks.length) { examEngineSpeakerFinish(wordsRef); return; }
+      const chunk = chunks[chunkIdx];
+      const chunkWords = remainingWords.slice(chunk.start, chunk.end);
+      const fullText = chunkWords.map(function (w) { return w.raw; }).join(' ');
+      const spokenText = ttsPronounceable(fullText);
+      const utter = new SpeechSynthesisUtterance(spokenText);
+      if (voice) utter.voice = voice;
+      utter.rate = rate;
+      examSpeakerUtterance = utter;
+
+      let cumulative = 0;
+      const wordStarts = spokenText.split(' ').map(function (w) {
+        const start = cumulative;
+        cumulative += w.length + 1;
+        return start;
+      });
+
+      examSpeakerStartWatchdog = setTimeout(function () {
+        if (examSpeakerUtterance !== utter) return;
+        if (!utter._started) window.speechSynthesis.resume();
+      }, 300);
+      const estimatedMs = Math.round(Math.max(2000, (chunkWords.length / 2.5 / rate) * 1000 * 3));
+      examSpeakerHardWatchdog = setTimeout(function () {
+        if (examSpeakerUtterance !== utter) return;
+        try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+        finishChunk();
+      }, estimatedMs);
+
+      utter.onstart = function () { ttsSpeaking = true; utter._started = true; };
+      utter.onboundary = function (event) {
+        if (examSpeakerUtterance !== utter) return;
+        if (event.name && event.name !== 'word') return;
+        let idx = -1;
+        for (let i = wordStarts.length - 1; i >= 0; i--) {
+          if (event.charIndex >= wordStarts[i]) { idx = i; break; }
+        }
+        if (idx < 0 || idx >= chunkWords.length) return;
+        const globalIdx = startIdx + chunk.start + idx;
+        if (wordsRef[globalIdx].status === 'pending') wordsRef[globalIdx].status = 'correct';
+        examEnginePointer = Math.min(globalIdx + 1, wordsRef.length);
+        examEngineRenderCallback();
+      };
+      function finishChunk() {
+        ttsSpeaking = false;
+        muteRecognitionUntil = Date.now() + 400;
+        clearTimeout(examSpeakerStartWatchdog); examSpeakerStartWatchdog = null;
+        clearTimeout(examSpeakerHardWatchdog); examSpeakerHardWatchdog = null;
+        if (examSpeakerUtterance !== utter) return; // a newer utterance already superseded this one
+        examSpeakerUtterance = null;
+        if (examNaturalSpeakSession !== session) return; // stopped during this very chunk
+        // Resolve every word in this chunk even if onboundary under-covered it — same safety net
+        // examEngineSpeakerFinish provides at the very end of the plain path.
+        for (let k = chunk.start; k < chunk.end; k++) {
+          const w = wordsRef[startIdx + k];
+          if (w.status === 'pending') w.status = 'correct';
+        }
+        examEnginePointer = Math.min(startIdx + chunk.end, wordsRef.length);
+        examEngineRenderCallback();
+        examNaturalChunkTimer = setTimeout(function () {
+          if (examNaturalSpeakSession !== session) return;
+          speakChunk(chunkIdx + 1);
+        }, EXAM_NATURAL_CHUNK_PAUSE_MS);
+      }
+      utter.onend = finishChunk;
+      utter.onerror = finishChunk;
+      window.speechSynthesis.speak(utter);
+    }
+    speakChunk(0);
   }
 
   const ExamSR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3952,7 +5699,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     q.options[idx].scored = true;
     if (examCurrentOptionIndex === idx) examCurrentOptionIndex = -1;
     examAnswerStatus.textContent = q.options.every(o => o.scored)
-      ? 'All answer choices read — choose your answer below.'
+      ? ('All answer choices read — choose your answer' + (q.multiSelect ? 's' : '') + ' below.')
       : 'Nice — play any other choice, or read this one again anytime.';
     examRenderOptionsList();
   }
@@ -3999,7 +5746,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       }
       if (entry.underline) {
         const tw = doc.getTextWidth(entry.text);
-        doc.setDrawColor(entry.color[0], entry.color[1], entry.color[2]);
+        // underlineColor lets a word's underline differ from its own text color — used by the
+        // passage's Mark Up annotation (examPassagePdfEntries), where the underline is always
+        // purple regardless of whatever reading-status color the word's text itself has, matching
+        // the on-screen wavy purple underline. Defaults to the text's own color otherwise (the
+        // existing notes-keyword underline on answer choices, where the two have always matched).
+        const uc = entry.underlineColor || entry.color;
+        doc.setDrawColor(uc[0], uc[1], uc[2]);
         doc.setLineWidth(0.75);
         doc.line(cursor.x, cursor.y + 2, cursor.x + tw, cursor.y + 2);
       }
@@ -4029,7 +5782,33 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         text: w.raw,
         color: examWordPdfColor(w.status),
         strike: w.status === 'incorrect',
-        underline: examKeywordMatches(w.norm, keywordSet)
+        underline: examKeywordMatches(examKeywordKey(w.raw), keywordSet)
+      };
+    });
+  }
+
+  // Purple wavy underline on an edited passage word in the PDF — the paper equivalent of the
+  // on-screen .word.markup-edit treatment (see its own CSS comment).
+  const EXAM_PDF_MARKUP_UNDERLINE_COLOR = [147, 51, 234];
+
+  // Word-level PDF entries for the passage section (see examExportPdf, the only caller): each word
+  // keeps its ordinary reading-status color (examWordPdfColor — same palette as every other word in
+  // this PDF) and gets struck through if it was read incorrectly, exactly like question/option text
+  // — but wherever a selected answer's Mark Up edit covers it (examMarkupTextForIndexAlways), the
+  // "after" text is shown in its place with a purple underline added on top, mirroring the on-screen
+  // wavy purple underline. Deliberately ignores examMarkupToggle (unlike the on-screen render) — the
+  // exported passage is a record of the answers actually chosen, not a snapshot of whether Mark Up
+  // happened to be switched on when Submit was clicked.
+  function examPassagePdfEntries() {
+    return examPassageWords.map(function (w, i) {
+      const markupText = examMarkupTextForIndexAlways(i);
+      const isEdit = markupText !== null;
+      return {
+        text: isEdit ? markupText : w.raw,
+        color: examWordPdfColor(w.status),
+        strike: w.status === 'incorrect',
+        underline: isEdit,
+        underlineColor: EXAM_PDF_MARKUP_UNDERLINE_COLOR
       };
     });
   }
@@ -4063,7 +5842,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(0, 0, 0);
-    doc.text('Q-Along — Results', startX, cursor.y);
+    doc.text('Guide My Pace — Results', startX, cursor.y);
     cursor.y += 22;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -4092,6 +5871,23 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examPdfFlowWords(doc, examWordsToPdfEntries(q.words), cursor, flowOpts);
       cursor.y += 6;
 
+      // This question's attached picture/table/chart crops (see examDetectAndInsertPageImages),
+      // between the question text and the notes/answer-choices below it — same placement the
+      // on-screen view uses (examRenderQuestionImages). Each is scaled down to fit the column
+      // width (never scaled UP past its own extracted resolution) and, failing that, down again to
+      // fit under a single page's remaining height, so an unusually tall diagram never gets
+      // silently clipped by jsPDF.
+      (q.images || []).forEach(function (img) {
+        const availW = maxX - startX;
+        const availH = pageBottom - pageTop;
+        let w = img.w, h = img.h;
+        if (w > availW) { const s = availW / w; w *= s; h *= s; }
+        if (h > availH) { const s = availH / h; w *= s; h *= s; }
+        if (cursor.y + h > pageBottom) { doc.addPage(); cursor.y = pageTop; }
+        doc.addImage(img.data, 'PNG', startX, cursor.y, w, h);
+        cursor.y += h + 10;
+      });
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
@@ -4115,7 +5911,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       const keywordSet = examKeywordSetFromNotes(q.notes);
 
       q.options.forEach(function (opt, oi) {
-        const isSelected = q.selectedAnswer === oi;
+        const isSelected = q.multiSelect ? q.selectedAnswers.indexOf(oi) !== -1 : q.selectedAnswer === oi;
         if (cursor.y > pageBottom) { doc.addPage(); cursor.y = pageTop; }
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(12);
@@ -4132,16 +5928,84 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       cursor.y += 18;
     });
 
+    // ---- Passage (see examPassagePdfEntries) — always its own fresh page at the end, since it's a
+    // reference for the whole set rather than something tied to any one question. Skipped entirely
+    // for a document with no passage (examPassageWords stays empty — see examBeginQuestionSet). ----
+    if (examPassageWords.length) {
+      doc.addPage();
+      cursor.x = startX;
+      cursor.y = pageTop;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Passage', startX, cursor.y);
+      cursor.y += 22;
+
+      // Only shown when at least one question's selected answer actually produced a Mark Up edit —
+      // no point explaining a color key that never appears anywhere on the page.
+      if (examMarkupEdits.size) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(EXAM_PDF_MARKUP_UNDERLINE_COLOR[0], EXAM_PDF_MARKUP_UNDERLINE_COLOR[1], EXAM_PDF_MARKUP_UNDERLINE_COLOR[2]);
+        doc.text('Purple, underlined text marks a Mark Up edit from a selected answer choice.', startX, cursor.y);
+        doc.setTextColor(0, 0, 0);
+        cursor.y += 18;
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      cursor.x = startX;
+      // Flowed one paragraph at a time (same grouping as the on-screen <p class="para-block">
+      // blocks — see examBuildPassageSpans) so paragraph breaks survive into the PDF rather than
+      // every line running together; a paragraph whose own trailing gap is "tight"
+      // (examPassageParaTight) gets no extra space after it, matching the on-screen spacing.
+      const passageEntries = examPassagePdfEntries();
+      let paraWords = [];
+      let currentPara = examPassageWords[0].para;
+      examPassageWords.forEach(function (w, i) {
+        if (w.para !== currentPara) {
+          examPdfFlowWords(doc, paraWords, cursor, flowOpts);
+          if (!examPassageParaTight[currentPara]) cursor.y += 10;
+          paraWords = [];
+          currentPara = w.para;
+        }
+        paraWords.push(passageEntries[i]);
+      });
+      if (paraWords.length) examPdfFlowWords(doc, paraWords, cursor, flowOpts);
+    }
+
     doc.save(examResultsFileName());
   }
 
-  // "<today's date> q-along results.pdf" — a sortable YYYY-MM-DD date (not a locale-formatted one)
-  // so filenames stay consistent and sort correctly regardless of the reader's browser locale.
-  function examResultsFileName() {
+  // "<today's date> guide my pace results.pdf" — a sortable YYYY-MM-DD date (not a locale-formatted
+  // one) so filenames stay consistent and sort correctly regardless of the reader's browser locale.
+  // This is the DEFAULT only — examResultsFileName() below is what callers (examExportPdf) actually
+  // use, and it falls back to this whenever the optional export-filename field is left blank.
+  function examDefaultResultsFileName() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     const stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-    return stamp + ' q-along results.pdf';
+    return stamp + ' guide my pace results.pdf';
+  }
+
+  // Strips characters that aren't safe in a downloaded file name across OSes (path separators,
+  // reserved Windows characters, control characters) without rejecting the whole input — same
+  // spirit as a browser's own "Save As" sanitizing, so a pasted title with a stray "/" or ":"
+  // still produces a sensible file rather than silently falling back to the default.
+  function examSanitizeFileNamePart(raw) {
+    return raw.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').trim();
+  }
+
+  // The optional field on the Submit screen (#examExportFileName) overrides the default name when
+  // the user types something — a blank/whitespace-only field (the common case: most people never
+  // touch it) falls straight back to examDefaultResultsFileName(), preserving today's behavior
+  // exactly. A user-entered name gets ".pdf" appended only if they didn't already type their own.
+  function examResultsFileName() {
+    const typed = examExportFileNameInput ? examSanitizeFileNamePart(examExportFileNameInput.value || '') : '';
+    if (!typed) return examDefaultResultsFileName();
+    return /\.pdf$/i.test(typed) ? typed : typed + '.pdf';
   }
 
   // ---- Submit -> session log (persistent, multi-session — same architecture as Read mode's log) ----
@@ -4243,7 +6107,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examLoadLog() {
     if (!canPersistLog) return;
     try {
-      const raw = localStorage.getItem(EXAM_LOG_STORAGE_KEY);
+      const raw = localStorage.getItem(EXAM_LOG_STORAGE_KEY)
+        || localStorage.getItem(EXAM_LOG_STORAGE_KEY_LEGACY_CUEFORWARD)
+        || localStorage.getItem(EXAM_LOG_STORAGE_KEY_LEGACY_QALONG);
       if (raw) examSessionLog = JSON.parse(raw);
     } catch (e) {
       examSessionLog = [];
@@ -4327,7 +6193,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         ]);
       });
     });
-    downloadFile('q-along-exam-word-level-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
+    downloadFile('guide-my-pace-exam-word-level-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
   }
 
   function examExportSessionCsv() {
@@ -4339,12 +6205,314 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       rows.push([entry.id, entry.timestamp, entry.student, modeText, entry.totalQuestions, entry.total, entry.correct, entry.helped,
         entry.skipped, entry.incorrect, entry.pct, entry.helperManual, entry.helperAuto, entry.helperWrongAttempt]);
     });
-    downloadFile('q-along-exam-session-summary-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
+    downloadFile('guide-my-pace-exam-session-summary-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
   }
 
   function examExportJsonLog() {
     if (!examSessionLog.length) { examLogStatusLine.textContent = 'No logged sessions to export yet.'; return; }
-    downloadFile('q-along-exam-log-' + Date.now() + '.json', JSON.stringify(examSessionLog, null, 2), 'application/json');
+    downloadFile('guide-my-pace-exam-log-' + Date.now() + '.json', JSON.stringify(examSessionLog, null, 2), 'application/json');
+  }
+
+  // ---------- word prediction (Notes box only) ----------
+  // Lightweight, offline word-completion for the notes textarea — no network call, no external
+  // library. As the reader types a partial word, a row of clickable chips offers full-word
+  // completions, drawn from two sources: (1) words already in the CURRENT question's stem and
+  // answer choices, so subject vocabulary (e.g. "migrate", "Artifact") is offered even though it's
+  // not in the common-word list below, and (2) a fixed list of a few hundred common English words.
+  // Passage words are offered first (most likely to be relevant to what the reader is writing
+  // about), then common words, in the order below (roughly commonest-first).
+  const EXAM_COMMON_WORDS = [
+    'the','a','an','of','to','in','on','at','for','with','by','from','about','into','through',
+    'during','before','after','above','below','up','down','out','off','over','under','again',
+    'further','then','once','here','there','when','where','why','how','all','any','both','each',
+    'few','more','most','other','some','such','no','nor','not','only','own','same','so','than',
+    'too','very','and','but','or','because','if','while','although','since','until','unless',
+    'i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its',
+    'our','their','mine','yours','hers','ours','theirs','myself','yourself','himself','herself',
+    'itself','ourselves','yourselves','themselves','this','that','these','those',
+    'is','am','are','was','were','be','been','being','have','has','had','do','does','did','will',
+    'would','shall','should','may','might','must','can','could',
+    'go','went','gone','going','come','came','coming','get','got','getting','make','made','making',
+    'take','took','taken','taking','see','saw','seen','seeing','know','knew','known','knowing',
+    'think','thought','thinking','say','said','saying','tell','told','telling','ask','asked',
+    'asking','give','gave','given','giving','find','found','finding','use','used','using','work',
+    'worked','working','call','called','calling','try','tried','trying','need','needed','needing',
+    'feel','felt','feeling','become','became','becoming','leave','left','leaving','put','putting',
+    'mean','meant','meaning','keep','kept','keeping','let','letting','begin','began','begun',
+    'beginning','seem','seemed','seeming','help','helped','helping','show','showed','shown',
+    'showing','hear','heard','hearing','play','played','playing','run','ran','running','move',
+    'moved','moving','live','lived','living','believe','believed','believing','bring','brought',
+    'bringing','happen','happened','happening','write','wrote','written','writing','sit','sat',
+    'sitting','stand','stood','standing','lose','lost','losing','pay','paid','paying','meet','met',
+    'meeting','include','included','including','continue','continued','continuing','set','setting',
+    'learn','learned','learning','change','changed','changing','lead','led','leading','understand',
+    'understood','understanding','watch','watched','watching','follow','followed','following',
+    'stop','stopped','stopping','create','created','creating','speak','spoke','spoken','speaking',
+    'read','reading','grow','grew','grown','growing','open','opened','opening','walk','walked',
+    'walking','win','won','winning','offer','offered','offering','remember','remembered',
+    'remembering','consider','considered','considering','appear','appeared','appearing','buy',
+    'bought','buying','wait','waited','waiting','serve','served','serving','send','sent','sending',
+    'build','built','building','stay','stayed','staying','fall','fell','fallen','falling','cut',
+    'cutting','reach','reached','reaching','remain','remained','remaining',
+    'time','year','years','people','way','day','days','man','thing','things','woman','life','child',
+    'children','world','school','state','family','group','country','problem','hand','part','place',
+    'case','week','company','system','program','question','questions','work','government','number',
+    'night','point','home','water','room','mother','father','area','money','story','fact','month',
+    'lot','right','study','book','eye','eyes','job','word','words','business','issue','side','kind',
+    'head','house','service','friend','power','hour','game','line','end','member','law','car','city',
+    'community','name','president','team','minute','idea','ideas','body','information','parent',
+    'face','moment','air','teacher','force','education','answer','answers','choice','choices',
+    'because','reason','reasons','example','examples','text','passage','author','main','detail',
+    'details','summary','compare','contrast','cause','effect','predict','infer','conclude',
+    'describe','explain','evidence','correct','wrong','sentence','paragraph','chapter','title',
+    'character','characters','setting','plot','event','events','clue','clues',
+    'good','new','first','last','long','great','little','other','old','right','big','high',
+    'different','small','large','next','early','young','important','few','public','bad','same',
+    'able','sure','sad','happy','angry','afraid','surprised','confused','excited','interesting',
+    'difficult','easy','simple','possible','true','false','real','whole','certain','likely',
+    'what','who','whom','whose','which','why','how',
+    'one','two','three','four','five','six','seven','eight','nine','ten',
+    'dog','cat','bird','fish','tree','flower','sun','moon','star','sky','rain','snow','wind',
+    'river','mountain','ocean','forest','animal','animals','plant','plants'
+  ];
+
+  // Every word already loaded for the active question (stem + all answer choices), lowercased and
+  // deduped — offered ahead of the common-word list since it's exactly the vocabulary the reader
+  // is reading and writing about right now.
+  function examWordPredictPassageWords() {
+    const q = examActiveQuestion();
+    if (!q) return [];
+    const seen = new Set();
+    const out = [];
+    const addAll = function (words) {
+      (words || []).forEach(function (w) {
+        const norm = (w.raw || '').toLowerCase().replace(/[^a-z']/g, '');
+        if (norm.length < 2 || seen.has(norm)) return;
+        seen.add(norm);
+        out.push(norm);
+      });
+    };
+    addAll(q.words);
+    q.options.forEach(function (opt) { addAll(opt.words); });
+    return out;
+  }
+
+  // The word currently being typed, i.e. the run of letters/apostrophes immediately before the
+  // caret — only when the caret sits at the END of that run (mid-word completions aren't offered,
+  // since inserting there would need to splice into the middle of what's already typed). Returns
+  // null when there's nothing worth completing (a selection is active, the caret is mid-word, or
+  // the partial word is shorter than 2 letters).
+  function examWordPredictCurrentWord(value, caret) {
+    if (typeof value !== 'string' || typeof caret !== 'number') return null;
+    if (caret < value.length && /[A-Za-z']/.test(value[caret])) return null; // caret is mid-word
+    let start = caret;
+    while (start > 0 && /[A-Za-z']/.test(value[start - 1])) start--;
+    const word = value.slice(start, caret);
+    if (word.length < 2) return null;
+    return { word: word, start: start, end: caret };
+  }
+
+  // Up to `limit` completions for `prefix`, passage words first, then common words — case-
+  // insensitive, excludes the prefix itself (nothing to complete once it's already a whole word).
+  function examWordPredictSuggestions(prefix, limit) {
+    const max = limit || 6;
+    const lower = (prefix || '').toLowerCase();
+    if (lower.length < 2) return [];
+    const seen = new Set();
+    const out = [];
+    const consider = function (candidate) {
+      if (out.length >= max) return;
+      if (!candidate || candidate === lower || seen.has(candidate)) return;
+      if (candidate.indexOf(lower) !== 0) return;
+      seen.add(candidate);
+      out.push(candidate);
+    };
+    examWordPredictPassageWords().forEach(consider);
+    EXAM_COMMON_WORDS.forEach(consider);
+    return out;
+  }
+
+  // Capitalization is matched to what the reader already typed (all-caps prefix -> all-caps
+  // completion; capitalized prefix -> capitalized completion) so accepting a suggestion never
+  // silently lowercases something the reader deliberately capitalized (the start of a sentence,
+  // a proper noun already capitalized in the question text, etc.).
+  function examWordPredictMatchCase(prefix, suggestion) {
+    if (prefix === prefix.toUpperCase() && prefix !== prefix.toLowerCase()) return suggestion.toUpperCase();
+    if (prefix[0] === prefix[0].toUpperCase()) return suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+    return suggestion;
+  }
+
+  // Common word -> likely next words, for when the reader has just finished a whole word (caret
+  // right after it, separated by whitespace) rather than still typing one. Deliberately small and
+  // generic (pronouns, articles, common verbs/conjunctions, question words) since this is a
+  // fallback used only when the active question's own text has nothing more specific to offer.
+  const EXAM_COMMON_BIGRAMS = {
+    'i': ['think', 'believe', 'know', 'am'],
+    'you': ['are', 'can', 'should', 'need'],
+    'he': ['is', 'was', 'said', 'has'],
+    'she': ['is', 'was', 'said', 'has'],
+    'it': ['is', 'was', 'means', 'seems'],
+    'we': ['are', 'can', 'should', 'need'],
+    'they': ['are', 'were', 'said', 'have'],
+    'this': ['is', 'means', 'shows', 'suggests'],
+    'that': ['is', 'means', 'the', 'it'],
+    'the': ['author', 'answer', 'question', 'main', 'story', 'passage', 'text'],
+    'a': ['lot', 'few', 'question', 'good', 'group'],
+    'an': ['example', 'answer', 'important'],
+    'is': ['the', 'a', 'not', 'that'],
+    'was': ['the', 'a', 'not', 'because'],
+    'are': ['the', 'not', 'important', 'similar'],
+    'to': ['the', 'be', 'find', 'show', 'explain'],
+    'in': ['the', 'this', 'order', 'fact'],
+    'of': ['the', 'this', 'these'],
+    'and': ['the', 'then', 'also'],
+    'but': ['the', 'not', 'it'],
+    'because': ['the', 'it', 'of'],
+    'so': ['the', 'it', 'that'],
+    'think': ['the', 'it', 'that'],
+    'believe': ['the', 'it', 'that'],
+    'know': ['the', 'that', 'it'],
+    'answer': ['is', 'choice', 'because'],
+    'author': ['is', 'wants', 'uses', 'says'],
+    'main': ['idea', 'point', 'character'],
+    'does': ['not', 'the', 'this'],
+    'do': ['not', 'the', 'this'],
+    'did': ['not', 'the', 'this'],
+    'what': ['is', 'does', 'happens'],
+    'why': ['does', 'did', 'is'],
+    'how': ['does', 'did', 'is', 'the'],
+    'when': ['does', 'did', 'the'],
+    'where': ['does', 'did', 'the'],
+    'who': ['is', 'was', 'does']
+  };
+
+  // Bigrams (word -> words that follow it) built fresh from the active question's own stem +
+  // answer-choice word sequences, mirroring examWordPredictPassageWords' passage-first priority.
+  // Word pairs are only chained within a single stem/option, never across the boundary between them.
+  function examWordPredictPassageBigrams() {
+    const q = examActiveQuestion();
+    if (!q) return {};
+    const map = {};
+    const addSeq = function (words) {
+      const norms = (words || []).map(function (w) { return (w.raw || '').toLowerCase().replace(/[^a-z']/g, ''); });
+      for (let i = 0; i < norms.length - 1; i++) {
+        const cur = norms[i], next = norms[i + 1];
+        if (!cur || !next) continue;
+        if (!map[cur]) map[cur] = [];
+        if (map[cur].indexOf(next) === -1) map[cur].push(next);
+      }
+    };
+    addSeq(q.words);
+    q.options.forEach(function (opt) { addSeq(opt.words); });
+    return map;
+  }
+
+  // The word immediately before the caret, when the caret sits right after that word plus
+  // whitespace (i.e. the reader just finished typing a word and is starting a new one) — an
+  // insertion point rather than a replace-range, so start === end. Returns null when the
+  // character right before the caret isn't whitespace, or there's no completed word before that.
+  function examWordPredictLastWord(value, caret) {
+    if (typeof value !== 'string' || typeof caret !== 'number') return null;
+    if (caret === 0 || !/\s/.test(value[caret - 1])) return null;
+    let end = caret - 1;
+    while (end > 0 && /\s/.test(value[end - 1])) end--;
+    let start = end;
+    while (start > 0 && /[A-Za-z']/.test(value[start - 1])) start--;
+    const word = value.slice(start, end);
+    if (!word || !/^[A-Za-z']+$/.test(word)) return null;
+    return { word: word, start: caret, end: caret };
+  }
+
+  // Up to `limit` next-word suggestions for `lastWord`, passage bigrams first, then common
+  // bigrams — same dedupe/cap pattern as examWordPredictSuggestions.
+  function examWordPredictNextWordSuggestions(lastWord, limit) {
+    const max = limit || 6;
+    const lower = (lastWord || '').toLowerCase();
+    if (!lower) return [];
+    const seen = new Set();
+    const out = [];
+    const consider = function (candidate) {
+      if (out.length >= max) return;
+      if (!candidate || seen.has(candidate)) return;
+      seen.add(candidate);
+      out.push(candidate);
+    };
+    (examWordPredictPassageBigrams()[lower] || []).forEach(consider);
+    (EXAM_COMMON_BIGRAMS[lower] || []).forEach(consider);
+    return out;
+  }
+
+  let examWordPredictState = null; // { start, end } of the partial word the shown chips complete
+
+  function examHideWordPredictions() {
+    examWordPredictState = null;
+    examWordPredictBar.hidden = true;
+    examWordPredictBar.innerHTML = '';
+  }
+
+  function examRenderWordPredictChips(suggestions, matchCaseAgainst) {
+    examWordPredictBar.innerHTML = '';
+    suggestions.forEach(function (s) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'word-predict-chip';
+      chip.textContent = matchCaseAgainst ? examWordPredictMatchCase(matchCaseAgainst, s) : s;
+      // mousedown (not click) + preventDefault keeps focus/selection in the textarea, so the
+      // stored start/end (captured above) is still exactly where the reader's caret is.
+      chip.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        examInsertWordPrediction(chip.textContent);
+      });
+      examWordPredictBar.appendChild(chip);
+    });
+    examWordPredictBar.hidden = false;
+  }
+
+  function examUpdateWordPredictions() {
+    if (examNotesInput.selectionStart !== examNotesInput.selectionEnd) { examHideWordPredictions(); return; }
+    const caret = examNotesInput.selectionStart;
+    const value = examNotesInput.value;
+
+    // Completion mode: reader is still typing a word (e.g. "mig") -> offer whole words it could
+    // become. Tried first since it's the more specific/expected behavior while mid-word.
+    const current = examWordPredictCurrentWord(value, caret);
+    if (current) {
+      const suggestions = examWordPredictSuggestions(current.word);
+      if (suggestions.length) {
+        examWordPredictState = { start: current.start, end: current.end };
+        examRenderWordPredictChips(suggestions, current.word);
+        return;
+      }
+    }
+
+    // Next-word mode: reader just finished a word and is starting a new one (e.g. "I think ") ->
+    // offer likely next words. Falls back here only when completion mode found nothing.
+    const last = examWordPredictLastWord(value, caret);
+    if (last) {
+      const suggestions = examWordPredictNextWordSuggestions(last.word);
+      if (suggestions.length) {
+        examWordPredictState = { start: last.start, end: last.end };
+        examRenderWordPredictChips(suggestions, null);
+        return;
+      }
+    }
+
+    examHideWordPredictions();
+  }
+
+  function examInsertWordPrediction(word) {
+    if (!examWordPredictState) return;
+    const value = examNotesInput.value;
+    const before = value.slice(0, examWordPredictState.start);
+    const after = value.slice(examWordPredictState.end);
+    examNotesInput.value = before + word + ' ' + after;
+    const newCaret = before.length + word.length + 1;
+    examNotesInput.focus();
+    examNotesInput.setSelectionRange(newCaret, newCaret);
+    examHideWordPredictions();
+    // A real 'input' event so the existing notes listener (q.notes, ready-button gating, keyword
+    // highlighting) fires exactly as it would from typing — insertion isn't a special case.
+    examNotesInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
   // ---------- wire up ----------
@@ -4447,15 +6615,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examEditCard.hidden = true;
     examWorkCard.hidden = true;
     try {
-      const text = await examExtractPdfText(file);
+      const extracted = await examExtractPdfText(file);
+      const text = extracted.body;
       const parsedList = examSplitIntoQuestions(text);
       examPdfStatus.textContent = text
         ? (parsedList.length
             ? 'Found ' + parsedList.length + ' question' + (parsedList.length === 1 ? '' : 's') + ' — ready to go below.'
             : "Couldn't confidently find answer choices — add the question below.")
         : 'Could not find any text in that PDF — try a clearer scan, or type the question in below.';
-      examBeginQuestionSet(parsedList);
+      examBeginQuestionSet(parsedList, extracted.passage, extracted.images);
     } catch (e) {
+      examPassageText = '';
+      examRenderPassage();
       examPdfStatus.textContent = 'Could not read that PDF (' + e.message + ') — you can type the question in below instead.';
       examOpenEditStage('', []);
     }
@@ -4499,13 +6670,63 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examEngineStart();
   });
 
+  // Mirrors examQuestionPlayBtn exactly — same shared engine, same Speaker/Read mode split — just
+  // targeting the passage's own word list instead of a question stem. Not gated on an active
+  // question (the passage is document-level, not per-question) and doesn't touch any
+  // reveal/scoring gating when it finishes, since the passage is reference material, not a graded
+  // part of the set.
+  examPassagePlayBtn.addEventListener('click', function () {
+    primeTtsForSession();
+    if (!examSpeakerMode && !examEngineRecognition) {
+      examPassageStatus.textContent = "This browser doesn't support speech recognition, so it can't listen and check your reading — try Google Chrome or Microsoft Edge instead.";
+      return;
+    }
+    if (examSpeakerMode && !('speechSynthesis' in window)) {
+      examPassageStatus.textContent = "This browser doesn't support text-to-speech, so Speaker mode can't read the passage aloud — try Google Chrome or Microsoft Edge instead.";
+      return;
+    }
+    if (!examPassageWords.length) return;
+    if (examEngineListening && examEngineTarget === 'passage') {
+      examEngineStop();
+      return;
+    }
+    examPassageMode = examSpeakerMode ? 'speaker' : 'read';
+    examEngineResumePassage(examOnPassageDone);
+    examRenderPassageWords();
+    examPassageStatus.textContent = examSpeakerMode ? 'Reading the passage aloud…' : 'Listening… read the passage aloud.';
+    examEngineStart();
+  });
+
+  examPassageResetBtn.addEventListener('click', examResetPassage);
+
   examNotesInput.addEventListener('input', function () {
     const q = examActiveQuestion();
     if (!q) return;
     q.notes = examNotesInput.value;
     examUpdateReadyBtnGating();
     if (q.optionsRevealed) examRenderOptionsList();
+    examUpdateWordPredictions();
   });
+  // Caret movement alone (arrow keys, a mouse click inside the text) doesn't fire 'input', but it
+  // changes which partial word (if any) sits right before the caret, so predictions need to
+  // recheck then too — not just after a keystroke that changes the text.
+  examNotesInput.addEventListener('keyup', function (e) {
+    if (e.key === 'Tab' || e.key === 'Escape') return; // handled in keydown below
+    examUpdateWordPredictions();
+  });
+  examNotesInput.addEventListener('click', examUpdateWordPredictions);
+  examNotesInput.addEventListener('keydown', function (e) {
+    if (!examWordPredictState) return;
+    if (e.key === 'Tab') {
+      // Accept the first (best) suggestion instead of tabbing away — only intercepted while a
+      // suggestion is actually showing, so normal Tab navigation is untouched the rest of the time.
+      const first = examWordPredictBar.querySelector('.word-predict-chip');
+      if (first) { e.preventDefault(); examInsertWordPrediction(first.textContent); }
+    } else if (e.key === 'Escape') {
+      examHideWordPredictions();
+    }
+  });
+  examNotesInput.addEventListener('blur', examHideWordPredictions);
 
   examReadyBtn.addEventListener('click', function () {
     const q = examActiveQuestion();
@@ -4540,6 +6761,29 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   examSpeakerRateSelect.addEventListener('change', function () {
     examSpeakerRate = parseFloat(examSpeakerRateSelect.value) || 1;
   });
+
+  examNaturalLanguageToggle.addEventListener('change', function () {
+    examNaturalLanguageMode = examNaturalLanguageToggle.checked;
+  });
+
+  examNotesCaseSensitiveToggle.addEventListener('change', function () {
+    // examKeywordMatches reads this checkbox directly, so flipping it alone is enough to change
+    // future matches — but any already-rendered Keyword Match underlines need an explicit re-render
+    // to pick up the new setting immediately rather than waiting on the next unrelated redraw.
+    const q = examActiveQuestion();
+    if (q && q.optionsRevealed) examRenderOptionsList();
+  });
+
+  examPassageCoverToggle.addEventListener('change', function () {
+    examPassageRevealControls.hidden = !examPassageCoverToggle.checked;
+    examRenderPassageWords();
+  });
+  examPassageMaskColorPicker.addEventListener('input', function () { examApplyPassageMaskColor(examPassageMaskColorPicker.value); });
+  examPassageRevealWordsSelect.addEventListener('change', examRenderPassageWords);
+  examPassageRevealLinesSelect.addEventListener('change', examRenderPassageWords);
+
+  examTextMatchToggle.addEventListener('change', examRefreshTextMatches);
+  examMarkupToggle.addEventListener('change', examRefreshTextMatches);
 
   examDebugModeToggle.addEventListener('change', function () {
     examDebugMode = examDebugModeToggle.checked;
@@ -4651,6 +6895,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // initial load
   applyAppMode(); // sync body class / section visibility with whichever radio the browser restored
   applyMaskColor('#9ca3af'); // default block color: gray
+  examApplyPassageMaskColor('#9ca3af'); // same default, but its own independent CSS variable
   applyTypography(); // default dyslexia-friendly typography
   if ('speechSynthesis' in window) {
     populateVoiceList();
