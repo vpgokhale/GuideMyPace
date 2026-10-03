@@ -1008,16 +1008,22 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               </select>
             </span>
             <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Speaker mode will enable all text to be read aloud. When unchecked, the application will be listening for the reader's own speech. In either mode, the same flow applies — answer choices only unlock once the question has been processed, and each choice must be processed before a selection can be made.</div></details>
-            <!-- flex-basis:100% forces this onto its own line below Speaker mode/Speed regardless of
-                 viewport width, while staying inside the SAME .cover-controls block as Speaker mode
-                 (rather than a new sibling div) — a separate test (playwright_cover_test.js) asserts
-                 the Reader Mode cover block is Speaker mode's block's very next DOM sibling, so this
-                 avoids disturbing that adjacency rather than being a layout-only decision. -->
-            <label class="cover-toggle-label" style="flex-basis:100%">
-              <input type="checkbox" id="examNaturalLanguageToggle">
-              Natural Language
-            </label>
-            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Experimental. When checked, Speaker mode breaks what it reads into short phrases with a brief pause between each one, instead of one continuous sentence — closer to how a person naturally reads aloud. Off by default; only affects Speaker mode's own TTS playback.</div></details>
+            <!-- flex-basis:100% (now on this wrapper, not the label directly) forces the whole
+                 label+icon pair onto its own line below Speaker mode/Speed regardless of viewport
+                 width, while staying inside the SAME .cover-controls block as Speaker mode (rather
+                 than a new sibling div) — a separate test (playwright_cover_test.js) asserts the
+                 Reader Mode cover block is Speaker mode's block's very next DOM sibling, so this
+                 avoids disturbing that adjacency rather than being a layout-only decision. The label
+                 and its info icon are wrapped together (instead of the icon being a separate sibling
+                 flex item) so the icon sits right next to "Natural Language" on that same line
+                 instead of wrapping to a line of its own. -->
+            <span style="display:inline-flex; align-items:center; gap:7px; flex-basis:100%;">
+              <label class="cover-toggle-label">
+                <input type="checkbox" id="examNaturalLanguageToggle">
+                Natural Language
+              </label>
+              <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Experimental. When checked, Speaker mode breaks what it reads into short phrases with a brief pause between each one, instead of one continuous sentence — closer to how a person naturally reads aloud. Off by default; only affects Speaker mode's own TTS playback.</div></details>
+            </span>
           </div>
 
           <!-- Passage-only "cover unread text" scaffolding, mirroring Read mode's own cover
@@ -1089,6 +1095,20 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               Mark Up
             </label>
             <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">When checked, if the selected answer proposes an edit ("before → after"), the passage text is overwritten live to preview it.</div></details>
+          </div>
+
+          <!-- Moved here (next to the other global reading-view toggles) from its previous spot
+               right under the per-question Notes box — it's a standing setting, not something tied
+               to any one question, so it belongs alongside Text Match/Mark Up/Debug mode rather than
+               re-appearing inside examNotesBlock every time a new question loads. Still the exact
+               same #examNotesExactMatchToggle checkbox — examKeywordKey/examKeywordMatches read it
+               directly by ID, so relocating it here doesn't touch any matching logic. -->
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examNotesExactMatchToggle">
+              Notes - Exact Match
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Controls Keyword Match (the blue underline on an answer choice that echoes your notes). Unchecked (default): matching ignores letter case and punctuation entirely — "c" in your notes also matches "C", and "stops" in your notes matches "stops." or "stops," or "stops;" in an answer choice, since only the letters/digits are compared. Check this for an exact, character-for-character match — same case AND the exact same punctuation required — most useful for a punctuation/capitalization-fix worksheet where that's exactly what's being tested.</div></details>
           </div>
 
           <div class="cover-controls">
@@ -1170,13 +1190,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         <label class="field-label" for="examNotesInput">Notes — jot down your thinking</label>
         <textarea id="examNotesInput" class="text-input" style="min-height:70px"></textarea>
         <div class="word-predict-bar" id="examWordPredictBar" hidden></div>
-        <div class="cover-controls" style="margin-top:4px">
-          <label class="cover-toggle-label">
-            <input type="checkbox" id="examNotesCaseSensitiveToggle">
-            Notes Case Sensitive
-          </label>
-          <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Controls Keyword Match (the blue underline on an answer choice that echoes your notes). Unchecked (default): "c" in your notes also matches "C" in an answer choice. Check this to require the exact same case.</div></details>
-        </div>
         <div class="row">
           <button class="btn-primary" id="examReadyBtn" disabled>Show options</button>
         </div>
@@ -1326,7 +1339,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const examOptionsList   = document.getElementById('examOptionsList');
   const examNotesBlock    = document.getElementById('examNotesBlock');
   const examNotesInput    = document.getElementById('examNotesInput');
-  const examNotesCaseSensitiveToggle = document.getElementById('examNotesCaseSensitiveToggle');
+  const examNotesExactMatchToggle = document.getElementById('examNotesExactMatchToggle');
   const examWordPredictBar = document.getElementById('examWordPredictBar');
   const examReadyBtn      = document.getElementById('examReadyBtn');
   const examAnswerBlock   = document.getElementById('examAnswerBlock');
@@ -5192,16 +5205,36 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // Case-PRESERVING counterpart to examNormalize, used only for the notes-keyword underline
   // feature below (examKeywordMatches) — never for anything that scores against speech
   // recognition (examNormalize/.norm stay case-folded for that, since "Kamakura" spoken aloud
-  // should still match regardless of case; changing those would silently break scoring). This one
-  // is specifically about catching a CHARACTER-EXACT match, punctuation included: typing "Japan"
-  // in the notes box should underline only "Japan" in an answer choice, never "japan" — and typing
-  // "Kamakura," (with the trailing comma, e.g. copied from a comma-fix option) should underline
-  // only an option's own "Kamakura,", never a bare "Kamakura" that happens to sit next to a comma
-  // in a different option. No punctuation is stripped here (unlike examNormalize) — only
-  // surrounding whitespace is trimmed, since the raw option word already carries its own attached
-  // punctuation (e.g. "Kamakura," is one token, not "Kamakura" + ",").
+  // should still match regardless of case; changing those would silently break scoring).
+  //
+  // By default (unchecked "Notes - Exact Match"), ALL punctuation is stripped before comparing —
+  // not just a trailing period — so matching is on letters/digits alone: an answer choice word
+  // like "right;" or "stops." or "Kamakura," underlines from plain notes "right"/"stops"/"Kamakura",
+  // with no punctuation typed at all, since nobody naturally retypes the punctuation an answer
+  // choice happens to carry. (If stripping punctuation would leave nothing — a token that's pure
+  // punctuation, like a lone "-" used as a point-label separator — the original token is kept
+  // instead of being discarded, so that still matches itself.)
+  //
+  // Whether that stripping (and the case-insensitive fallback in examKeywordMatches below) applies
+  // at all is controlled by the "Notes - Exact Match" checkbox (examNotesExactMatchToggle,
+  // off/unchecked by default): unchecked is the friendly, punctuation-blind default described above;
+  // checked restores a full CHARACTER-EXACT match, same case and same punctuation required —
+  // typing "Japan" then underlines only "Japan", never "japan", and "stops" never underlines
+  // "stops." (the period now has to be typed too). This is the mode for a punctuation/
+  // capitalization-fix worksheet (paragraph editing), where a comma's presence or a trailing period
+  // IS the content being tested: typing "Kamakura," (with the trailing comma, e.g. copied from a
+  // comma-fix option) then underlines only an option's own "Kamakura,", never a bare "Kamakura"
+  // that happens to sit next to a comma in a different option (see playwright_keyword_comma_test.js,
+  // which checks this with Exact Match ON — with it off, punctuation is deliberately ignored, so
+  // "Kamakura" and "Kamakura," are the same keyword).
   function examKeywordKey(raw) {
-    return (raw || '').trim();
+    const t = (raw || '').trim();
+    const exact = examNotesExactMatchToggle && examNotesExactMatchToggle.checked;
+    if (exact) return t;
+    // \p{L}/\p{N} (Unicode letter/number) rather than A-Za-z0-9, so this doesn't mangle accented
+    // or non-Latin text — only actual punctuation/symbols are removed.
+    const lettersAndDigits = t.replace(/[^\p{L}\p{N}]+/gu, '');
+    return lettersAndDigits || t;
   }
 
   // Case-sensitive set of words found in a notes string — shared by the live on-screen underlining
@@ -5219,8 +5252,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       // apart from the token alone. Silently dropping one of those readings produced three separate
       // "why didn't X underline" reports in a row (first "C - D", then lowercase "c d", then "A" in
       // "A B" right alongside a "B" that worked) — so the filter is gone. Whatever is typed in
-      // Notes is now exactly what can underline, with no exceptions; see examKeywordMatches for the
-      // one knob that still exists (the "Notes Case Sensitive" checkbox).
+      // Notes is now exactly what can underline, with no exceptions; see examKeywordKey/
+      // examKeywordMatches for the one knob that still exists (the "Notes - Exact Match" checkbox).
       if (n) set.add(n);
     });
     return set;
@@ -5239,16 +5272,16 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // underline only an option's own exact "meet", never "meeting", "met", or anything else that
   // merely shares those letters.
   //
-  // Case handling is controlled by the "Notes Case Sensitive" checkbox (examNotesCaseSensitiveToggle,
-  // off/unchecked by default): unchecked means case-insensitive — "c" in the notes also flags "C" in
-  // an answer choice — which is the friendlier default for most notes. Checked restores the original
+  // Case handling is controlled by the same "Notes - Exact Match" checkbox (examNotesExactMatchToggle)
+  // examKeywordKey reads above: unchecked means case-insensitive — "c" in the notes also flags "C" in
+  // an answer choice — which is the friendlier default for most notes. Checked restores a full
   // exact, same-case-only comparison. Read directly off the checkbox (like examMarkupToggle.checked
   // elsewhere) rather than mirrored into a separate variable, so it can never drift out of sync with
   // what's on screen.
   function examKeywordMatches(key, keywordSet) {
     if (!key || !keywordSet || !keywordSet.size) return false;
     if (keywordSet.has(key)) return true;
-    if (examNotesCaseSensitiveToggle && examNotesCaseSensitiveToggle.checked) return false;
+    if (examNotesExactMatchToggle && examNotesExactMatchToggle.checked) return false;
     // Case-insensitive fallback: keywordSet keeps its members' original case (so a same-case exact
     // match via the checked path above still works unmodified), so this compares lowercased forms
     // one by one instead of maintaining a second lowercase-keyed set. These sets are always small
@@ -5312,7 +5345,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
           examUpdateSubmitVisibility();
           examUpdateNavGating();
           // Re-render so sibling checkboxes pick up the fresh at-required-count disabled state —
-          // the same pattern examNotesCaseSensitiveToggle's own change handler uses.
+          // the same pattern examNotesExactMatchToggle's own change handler uses.
           examRenderOptionsList();
         });
       } else {
@@ -7121,10 +7154,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examNaturalLanguageMode = examNaturalLanguageToggle.checked;
   });
 
-  examNotesCaseSensitiveToggle.addEventListener('change', function () {
-    // examKeywordMatches reads this checkbox directly, so flipping it alone is enough to change
-    // future matches — but any already-rendered Keyword Match underlines need an explicit re-render
-    // to pick up the new setting immediately rather than waiting on the next unrelated redraw.
+  examNotesExactMatchToggle.addEventListener('change', function () {
+    // examKeywordKey/examKeywordMatches read this checkbox directly, so flipping it alone is enough
+    // to change future matches — but any already-rendered Keyword Match underlines need an explicit
+    // re-render to pick up the new setting immediately rather than waiting on the next unrelated
+    // redraw.
     const q = examActiveQuestion();
     if (q && q.optionsRevealed) examRenderOptionsList();
   });
