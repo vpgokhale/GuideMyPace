@@ -1135,12 +1135,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       </details>
     </div>
 
-    <!-- Its own section, matching the Load card's pattern exactly — only shown when the loaded
-         document had a detected reading passage ahead of its questions (see
-         examExtractPassageAndBody). Stays visible across every stage (edit-and-fix, and each
-         question in the work card) rather than being tied to any one question, since it's the same
-         shared passage for all of them. Playable exactly like a question stem: Speaker/Read mode
-         both apply, via the same shared reading engine (see examPassagePlayBtn's click handler). -->
+    <!-- Its own section, matching the Load card's pattern exactly — shown whenever the ACTIVE
+         question has a passage attached to it (examActiveQuestion().passage), which covers two
+         different sources: a single passage detected ahead of ALL the questions (see
+         examExtractPassageAndBody — stays the same across every question, so this card simply
+         never changes while navigating that kind of document), or a passage embedded partway
+         through the document that only a specific run of questions references (see
+         examExtractMidDocumentPassages/examSplitIntoQuestions' passageIdx tagging — "Read the
+         passage and answer Questions 14-15." is the kind of instruction line that triggers this).
+         examSetActivePassage (called from examShowQuestion) is what actually swaps the card's
+         content, hides it, or leaves it alone as the reader moves between questions. Playable
+         exactly like a question stem: Speaker/Read mode both apply, via the same shared reading
+         engine (see examPassagePlayBtn's click handler). -->
     <div class="card" id="examPassageCard" hidden>
       <details class="card-toggle" id="examPassageDetails" open>
         <summary class="card-toggle-summary"><h2>📖 Passage</h2></summary>
@@ -3285,11 +3291,44 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       return true;
     }
 
+    // Same "consume before any parsing branch sees it" treatment as the image sentinel above, for
+    // examExtractMidDocumentPassages' own sentinel (see EXAM_PASSAGE_SENTINEL_RE). Unlike an image,
+    // a passage can apply to SEVERAL consecutive questions ("Questions 14-15" → count 2), so rather
+    // than attaching to just the one question about to start, it's tracked as a running "this many
+    // of the next questions created still get it" counter — startNew() (and stemsMode's own inline
+    // `current = {...}`) decrement it by one every time a new question actually starts, until it
+    // reaches zero and ordinary questions stop being tagged again.
+    let pendingPassageIdx = null;
+    let remainingPassageQuestions = 0;
+    function examConsumePassageSentinel(line) {
+      if (!examIsPassageSentinelLine(line)) return false;
+      const m = line.trim().match(EXAM_PASSAGE_SENTINEL_RE);
+      pendingPassageIdx = m ? parseInt(m[1], 10) : null;
+      remainingPassageQuestions = m ? (parseInt(m[2], 10) || 0) : 0;
+      return true;
+    }
+
     function finalizeCurrent() {
       if (current && current.optHits.length >= 2 && current.stem) {
-        questions.push({ stem: current.stem, options: current.optHits.map(h => h.text).filter(Boolean), images: current.images || [] });
+        questions.push({
+          stem: current.stem,
+          options: current.optHits.map(h => h.text).filter(Boolean),
+          images: current.images || [],
+          passageIdx: current.passageIdx != null ? current.passageIdx : null
+        });
       }
       current = null;
+    }
+    // Tags `current` with whichever mid-document passage is still "owed" to upcoming questions (see
+    // examConsumePassageSentinel above) — shared by startNew() and stemsMode's own inline question
+    // creation below, so both ways a new question can start apply this identically.
+    function attachPendingPassage(entry) {
+      if (remainingPassageQuestions > 0) {
+        entry.passageIdx = pendingPassageIdx;
+        remainingPassageQuestions--;
+      } else {
+        entry.passageIdx = null;
+      }
     }
     function startNew() {
       // A tight paragraph break ('\n\n\n') is what tells examBuildPassageWords/
@@ -3305,6 +3344,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         else { stemText += (seg.newLine ? '\n\n\n' : ' ') + cleaned; }
       });
       current = { stem: stemText.trim(), optHits: [], images: pendingImages };
+      attachPendingPassage(current);
       pendingImages = [];
       pendingStem = [];
       blankSincePush = false;
@@ -3315,6 +3355,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       lines.forEach(line => {
         if (!line.trim()) { blankSincePush = true; return; }
         if (examConsumeImageSentinel(line)) return;
+        if (examConsumePassageSentinel(line)) return;
         const m = line.match(bulletRe);
         if (m) {
           if (current && current.optHits.length >= 2 && gapSinceLastBullet) { finalizeCurrent(); startNew(); }
@@ -3376,10 +3417,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (stemsMode) {
         lines.forEach(line => {
           if (examConsumeImageSentinel(line)) return;
+          if (examConsumePassageSentinel(line)) return;
           const m = line.match(re);
           if (m) {
             finalizeCurrent();
             current = { stem: m[2].trim(), optHits: [], images: pendingImages };
+            attachPendingPassage(current);
             pendingImages = [];
           } else if (line.trim() && current) {
             current.optHits.push({ text: line.trim() });
@@ -3390,6 +3433,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         lines.forEach(line => {
           if (!line.trim()) { blankSincePush = true; return; }
           if (examConsumeImageSentinel(line)) return;
+          if (examConsumePassageSentinel(line)) return;
           const m = line.match(re);
           const label = m ? (dominant === 'letter' ? m[1].toUpperCase() : String(parseInt(m[1], 10))) : null;
           if (m && (label === nextExpected || label === firstLabel)) {
@@ -3602,6 +3646,21 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examImageSentinelLine(idx) {
     return 'IMG:' + idx + '';
   }
+  // Same idea as the image sentinel just above, for a reading passage embedded partway through a
+  // document rather than shared by every question (see examExtractMidDocumentPassages, which
+  // inserts this in place of the marker line + passage text it found, and examSplitIntoQuestions,
+  // which consumes it below). Carries two numbers rather than one: which passage (an index into
+  // the flat `midPassages` array threaded alongside the plain text, exactly like `images` is) and
+  // how many of the questions coming up next share it — "Questions 14-15" means 2, a single
+  // "Question 14" means 1. Wrapped in the same Private-Use-Area markers as the image sentinel,
+  // for the same reason: it can never collide with anything a real PDF would actually contain.
+  const EXAM_PASSAGE_SENTINEL_RE = /^PASSAGE:(\d+):(\d+)$/;
+  function examPassageSentinelLine(idx, count) {
+    return 'PASSAGE:' + idx + ':' + count + '';
+  }
+  function examIsPassageSentinelLine(text) {
+    return EXAM_PASSAGE_SENTINEL_RE.test((text || '').trim());
+  }
   // The same answer-choice marker shapes examSplitIntoQuestions itself looks for (its own
   // letterRe/numberRe/bulletRe, scoped to that function) — shared here by both the table detector
   // and the image-label-absorption logic below, each of which needs to recognize (and never
@@ -3710,6 +3769,56 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     return { passage: passage, body: split.body.trim() };
   }
 
+  // Some worksheets embed a reading passage partway through the document instead of (or as well
+  // as) one shared by every question — "Read the passage and answer Questions 14-15." on its own
+  // line, the passage text, then question 14's own stem starting right where the passage leaves
+  // off, with no gap or other structure marking the boundary. Left alone, that passage text simply
+  // becomes part of question 14's stem (exactly the bug reported: the passage and "14. What was
+  // the main purpose..." both ran together as one block). Detected here, BEFORE
+  // examSplitIntoQuestions ever sees this text, and replaced with a single sentinel line (see
+  // EXAM_PASSAGE_SENTINEL_RE) carrying an index into `passagesOut` plus how many of the following
+  // questions the marker named — examSplitIntoQuestions consumes that sentinel and tags however
+  // many questions it says, instead of any of this ever being read as question content.
+  //
+  // The one reliable boundary a marker like this gives is the number of its OWN first named
+  // question, printed the ordinary way a little further down ("14.", "14)") — search forward for
+  // that specific line and treat everything between the marker and it as the passage body. A
+  // marker that never finds that boundary (a stray sentence that merely LOOKS like the phrase, or
+  // a document that doesn't actually number its questions this way) is left completely alone,
+  // exactly as ordinary text, rather than risk swallowing real content on a false match — the same
+  // "fail safe" EXAM_PASSAGE_MIN_WORDS already enforces for the leading whole-document passage
+  // above applies here too, so a near-miss never turns into a mostly-empty passage section either.
+  const EXAM_MID_PASSAGE_MARKER_RE = /^(?:read|use|refer to)\s+the\s+passages?(?:\s+(?:below|above))?\s+(?:and\s+|to\s+)?answer\s+questions?\s+(\d{1,3})(?:\s*(?:[-–—]|to|through|and)\s*(\d{1,3}))?\.?\s*$/i;
+  function examExtractMidDocumentPassages(text, passagesOut) {
+    const lines = (text || '').split('\n');
+    const result = [];
+    let i = 0;
+    while (i < lines.length) {
+      const trimmed = lines[i].trim();
+      const markerMatch = trimmed ? EXAM_MID_PASSAGE_MARKER_RE.exec(trimmed) : null;
+      if (!markerMatch) { result.push(lines[i]); i++; continue; }
+      const startNum = parseInt(markerMatch[1], 10);
+      const endNum = markerMatch[2] ? parseInt(markerMatch[2], 10) : startNum;
+      const count = endNum >= startNum ? (endNum - startNum + 1) : 1;
+      const boundaryRe = new RegExp('^\\(?' + startNum + '[.):]\\s+\\S');
+      let boundaryIdx = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        if (boundaryRe.test(lines[j].trim())) { boundaryIdx = j; break; }
+      }
+      const passageText = boundaryIdx === -1 ? '' : lines.slice(i + 1, boundaryIdx).join('\n').trim();
+      if (boundaryIdx === -1 || examPassageWordCount(passageText) < EXAM_PASSAGE_MIN_WORDS) {
+        result.push(lines[i]);
+        i++;
+        continue;
+      }
+      const idx = passagesOut.length;
+      passagesOut.push(passageText);
+      result.push(examPassageSentinelLine(idx, count));
+      i = boundaryIdx; // resume right at the boundary line — it's question content, not passage text
+    }
+    return result.join('\n');
+  }
+
   // Google Forms (and similar quiz-platform exports) always end the actual form content with its
   // own Submit/Clear-form controls, immediately followed by legal/footer boilerplate (terms,
   // privacy policy, a "report this form" link, branding) that has nothing to do with the
@@ -3745,6 +3854,52 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       if (/^\*\s*indicates\s+required\s+question$/i.test(t)) return false;
       return true;
     }).join('\n');
+  }
+
+  // A repeating page header/footer: a short running title line — "Texas History Chapter 5 — Mock
+  // Quiz  •  Page 1" is the motivating example — that a worksheet template stamps at the top (or
+  // bottom) of EVERY page. It sits at completely ordinary line spacing from whatever real content
+  // follows it (the page's own top margin looks identical to normal paragraph spacing, so there's no
+  // Y-gap to flag it the way a picture or table would be), so left alone it silently glues onto
+  // question 1 of that page — or question 8, page 2, whichever question happens to start there —
+  // becoming part of its stem. Recognized by the one reliable textual signal a template-stamped
+  // header/footer almost always carries — ending in "Page N" (optionally "Page N of M") — combined
+  // with structural checks that keep it from ever swallowing a real question or option line that
+  // simply happens to mention a page number in passing.
+  const EXAM_PAGE_HEADER_TRAILING_PAGE_RE = /\bpage\s+\d+(\s+of\s+\d+)?\.?\s*$/i;
+  const EXAM_PAGE_HEADER_MAX_WORDS = 16;
+  function examIsPageHeaderLine(text) {
+    const t = (text || '').trim();
+    if (!t) return false;
+    if (!EXAM_PAGE_HEADER_TRAILING_PAGE_RE.test(t)) return false;
+    // Never a real question or answer-choice line — those are recognized by their own leading
+    // marker, never by this trailing-text pattern alone.
+    if (EXAM_OPTION_MARKER_LINE_RE.test(t) || /^\d+[.)]\s/.test(t)) return false;
+    // A genuine sentence that happens to end "...on page 5." (part of real question content) still
+    // carries its own sentence-ending punctuation once the trailing "Page N" is peeled back off; a
+    // template header/footer is just a bare title/label fragment with none of its own. A comma
+    // anywhere in what's left is the same tell — real prose flows with commas ("As discussed
+    // earlier, see Page 1"), a title fragment never does (mirrors examIsImageLabelLine's own
+    // comma check, used there for the same reason: telling a short label from real sentence text).
+    const withoutPageTail = t.replace(EXAM_PAGE_HEADER_TRAILING_PAGE_RE, '').trim();
+    if (/[.!?,;:]$/.test(withoutPageTail) || withoutPageTail.indexOf(',') !== -1) return false;
+    if (t.split(/\s+/).length > EXAM_PAGE_HEADER_MAX_WORDS) return false;
+    return true;
+  }
+
+  // Strips a recognized running header from the TOP of a page's line list and a recognized running
+  // footer from the BOTTOM, in place conceptually (returns a new array) — called once per page,
+  // before table/image detection even sees the lines, so a header never has a chance to widen into a
+  // phantom "image gap" candidate either. Deliberately only ever looks at the first and last lines:
+  // a real header/footer is, by definition, the first or last thing on the page, never buried in the
+  // middle, so this can't accidentally reach into real content.
+  function examStripPageHeaderFooterLines(lines) {
+    if (!lines || !lines.length) return lines;
+    let start = 0;
+    let end = lines.length;
+    if (examIsPageHeaderLine(lines[start].text)) start++;
+    if (end > start && examIsPageHeaderLine(lines[end - 1].text)) end--;
+    return start === 0 && end === lines.length ? lines : lines.slice(start, end);
   }
 
   // A gap between two consecutive text lines that's unusually large — well beyond even a normal
@@ -4236,7 +4391,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examPdfStatus.textContent = 'Reading page ' + pageNum + ' of ' + pdf.numPages + '…';
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const rawLines = examItemsToLines(textContent.items);
+      const rawLines = examStripPageHeaderFooterLines(examItemsToLines(textContent.items));
       const linesWithTables = await examDetectAndInsertPageTables(rawLines, page, extractedImages);
       const linesWithImages = await examDetectAndInsertPageImages(linesWithTables, page, extractedImages);
       const pageText = examJoinLinesWithParagraphGaps(examMergeStrayMarkerLines(linesWithImages)).trim();
@@ -4269,12 +4424,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         combined += (combined ? '\n\n' : '') + (result.data.text || '').trim();
       }
     }
-    // Returns { passage, body, images } rather than a bare string — see examExtractPassageAndBody.
-    // `body` is what gets split into questions; `passage`, when non-empty, is a shared reading
-    // passage detected ahead of them; `images` is the flat, document-wide array of rasterized
-    // picture/table/chart crops that examSplitIntoQuestions' sentinel indices refer into — see
-    // examBeginQuestionSet, which resolves each question's indices back into this array.
+    // Returns { passage, body, images, midPassages } rather than a bare string — see
+    // examExtractPassageAndBody. `body` is what gets split into questions; `passage`, when
+    // non-empty, is a shared reading passage detected ahead of them, applying to every question
+    // alike; `images` is the flat, document-wide array of rasterized picture/table/chart crops that
+    // examSplitIntoQuestions' sentinel indices refer into; `midPassages` is the equivalent flat
+    // array for a passage embedded partway through the document instead (examExtractMidDocument
+    // Passages), applying only to the specific run of questions its own marker named — see
+    // examBeginQuestionSet, which resolves both kinds of indices back into these arrays.
     const extracted = examExtractPassageAndBody(examStripFormFooter(examNormalizeStrayLetterBullets(combined.trim())));
+    const midPassages = [];
+    extracted.body = examExtractMidDocumentPassages(extracted.body, midPassages);
+    extracted.midPassages = midPassages;
     extracted.images = extractedImages;
     return extracted;
   }
@@ -4347,7 +4508,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     return null;
   }
 
-  function examBuildQuestionEntry(stem, options, images) {
+  function examBuildQuestionEntry(stem, options, images, passageText) {
     const cleanStem = examStripLeadingMarker(stem);
     // examSplitIntoQuestions marks a stem line that started fresh (a blank line separated it from
     // what came before — see its own pendingStem handling) with a tight paragraph break, so a
@@ -4381,7 +4542,15 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       // — rendered between the stem and the answer choices (examRenderQuestionImages) and included
       // the same way in the exported results PDF (examExportPdf). Always an array, never missing,
       // so every other reader of a question object can use it without a null check.
-      images: images || []
+      images: images || [],
+      // Plain text of whichever passage this question shows alongside it — either the single
+      // whole-document passage (examExtractPassageAndBody), threaded in identically for every
+      // question by examBeginQuestionSet, or a passage embedded partway through the document that
+      // applies only to this question's own range (examExtractMidDocumentPassages/passageIdx).
+      // Always a string, '' when there's none, so every reader can use it without a null check —
+      // examShowQuestion passes it straight to examSetActivePassage every time this question
+      // becomes active.
+      passage: passageText || ''
     };
   }
 
@@ -4451,6 +4620,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     if (!q) return;
     examCurrentOptionIndex = -1;
     examEngineTarget = null;
+
+    // Swap the passage card to match this question's own — a no-op rebuild when it's the same text
+    // already showing (see examSetActivePassage), which is the common case for a passage several
+    // consecutive questions share.
+    examSetActivePassage(q.passage || '');
 
     examWorkHeading.textContent = 'Question ' + (idx + 1) + ' of ' + examQuestions.length;
     examUpdateNavGating();
@@ -4820,13 +4994,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     });
   }
 
-  // Builds the passage's word list once per load (called from examBeginQuestionSet, not from
-  // examShowQuestion) so reading progress and the open/collapsed state a reader chose aren't reset
-  // just from moving between questions — the same passage, and the same read-once-scored state,
-  // stays put across the whole set. Hidden entirely when this document had no detected passage.
-  // Renders with the same word-by-word .word spans as a question stem (see examRenderPassageWords)
-  // rather than plain paragraph text, since the passage is now playable through the shared engine
-  // exactly like one — see examPassagePlayBtn's click handler.
+  // Swaps which passage (if any) is showing to match whichever text is now active — called from
+  // examBeginQuestionSet for the initial load and from examShowQuestion (via examSetActivePassage,
+  // just below) every time the reader navigates to a different question, since a question's own
+  // passage can now vary (examExtractMidDocumentPassages/examBuildQuestionEntry's `passage` field).
+  // Rebuilds the word list, clears Mark Up edits, and resets read/scored state — appropriate when
+  // the passage text actually changed, but examSetActivePassage is what skips calling this at all
+  // when it hasn't (the common case: moving between two questions that share the same passage, or
+  // between two that both have none), so reading progress and Mark Up edits on a passage several
+  // questions share aren't wiped and restarted on every single navigation between them. Hidden
+  // entirely when there's no passage to show. Renders with the same word-by-word .word spans as a
+  // question stem (see examRenderPassageWords) rather than plain paragraph text, since the passage
+  // is playable through the shared engine exactly like one — see examPassagePlayBtn's click handler.
   function examRenderPassage() {
     // Every recorded Mark Up edit (examMarkupEdits) is a passage-word INDEX plus the question it
     // came from — both meaningless once a new document (new passage, new question set) loads, so
@@ -4851,13 +5030,28 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examPassageScored = false;
     examPassageMode = null;
     examPassageStatus.textContent = '';
-    // A fresh document is the only place the word list itself actually changes shape/content —
-    // always rebuild the span DOM here explicitly, rather than relying on examRenderPassageWords'
-    // own length-based staleness check, since two different documents could coincidentally have
-    // the same word count (which would otherwise wrongly reuse stale spans with the old text).
+    // Always rebuild the span DOM here explicitly, rather than relying on examRenderPassageWords'
+    // own length-based staleness check, since two different passages could coincidentally have the
+    // same word count (which would otherwise wrongly reuse stale spans with the old text) — this
+    // only runs when the passage text has actually changed (examSetActivePassage below is what
+    // decides that), so it's never doing this needlessly on every ordinary question navigation.
     examBuildPassageSpans();
     examRenderPassageWords();
     examPassageCard.hidden = false;
+  }
+
+  // Called from examShowQuestion every time the active question changes, with that question's own
+  // `.passage` (possibly ''). Only actually rebuilds (examRenderPassage — which resets Mark Up
+  // edits and read/scored progress) when the text is genuinely different from whatever's already
+  // showing; the common case, moving between two questions that share the same passage (the
+  // historical whole-document kind, or several questions named by one "Questions 14-15"-style
+  // marker alike), leaves everything exactly as the reader left it. examBeginQuestionSet calls
+  // examRenderPassage directly instead, for the very first load of a document.
+  function examSetActivePassage(text) {
+    const next = text || '';
+    if (next === examPassageText) return;
+    examPassageText = next;
+    examRenderPassage();
   }
 
   // Persistent word-span elements, parallel to examPassageWords — built once per document load
@@ -5078,8 +5272,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // found at all, falls back to the editable check-and-fix screen for manual single-question entry.
   // `passageText` (possibly '') is set and rendered unconditionally, even on that fallback path —
   // if the reader then fixes up a question by hand, the passage detected alongside it is still
-  // there once they reach the work card.
-  function examBeginQuestionSet(parsedList, passageText, imagesFlat) {
+  // there once they reach the work card. That's the single whole-document passage, shared by every
+  // question alike; a question whose own `p.passageIdx` points into `midPassagesFlat` instead (a
+  // passage embedded partway through the document — see examExtractMidDocumentPassages — that
+  // applies only to the run of questions its own marker named) gets THAT text instead, overriding
+  // the document-level one just for itself. examShowQuestion/examSetActivePassage is what actually
+  // shows the right one as the reader navigates from question to question afterward.
+  function examBeginQuestionSet(parsedList, passageText, imagesFlat, midPassagesFlat) {
     examPassageText = passageText || '';
     examRenderPassage();
     const valid = (parsedList || []).filter(p => p.stem && p.options && p.options.length >= 2);
@@ -5093,8 +5292,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     // alongside the text (examExtractPdfText) — resolve those back into the actual image objects
     // here, once, rather than threading the flat array any further than this. A missing/bad index
     // is simply dropped rather than throwing, since nothing about parsing here is ever guaranteed.
+    // `passageIdx` (examSplitIntoQuestions' own examConsumePassageSentinel) is resolved the same
+    // way, into `midPassagesFlat` — falling back to the document-level `passageText` for every
+    // question that doesn't have one of its own.
     examQuestions = valid.map(p => examBuildQuestionEntry(
-      p.stem, p.options, (p.images || []).map(idx => (imagesFlat || [])[idx]).filter(Boolean)
+      p.stem, p.options,
+      (p.images || []).map(idx => (imagesFlat || [])[idx]).filter(Boolean),
+      p.passageIdx != null ? ((midPassagesFlat || [])[p.passageIdx] || '') : (passageText || '')
     ));
     examEditCard.hidden = true;
     examWorkCard.hidden = false;
@@ -5106,6 +5310,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // fixing a parsing mistake never disturbs the other questions around it. Any images already
   // attached to the question being replaced (from the original PDF extraction) are carried over
   // unchanged — this screen only edits text, so there's nothing here that should ever drop them.
+  // Its passage (if it had one, whole-document or embedded-mid-document alike) is carried over the
+  // same way — fixing a typo in a question's stem shouldn't silently detach it from its passage.
   function examCommitEditedQuestion() {
     const stem = examQuestionInput.value.trim();
     const opts = examOptionTexts.map(t => t.trim()).filter(Boolean);
@@ -5113,7 +5319,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     if (opts.length < 2) { examPdfStatus.textContent = 'Add at least two answer choices before continuing.'; return; }
     const targetIdx = examQuestions.length ? examQuestionIndex : 0;
     const prevImages = (examQuestions[targetIdx] && examQuestions[targetIdx].images) || [];
-    examQuestions[targetIdx] = examBuildQuestionEntry(stem, opts, prevImages);
+    const prevPassage = (examQuestions[targetIdx] && examQuestions[targetIdx].passage) || '';
+    examQuestions[targetIdx] = examBuildQuestionEntry(stem, opts, prevImages, prevPassage);
     examEditCard.hidden = true;
     examWorkCard.hidden = false;
     examShowQuestion(targetIdx);
@@ -7011,7 +7218,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
             ? 'Found ' + parsedList.length + ' question' + (parsedList.length === 1 ? '' : 's') + ' — ready to go below.'
             : "Couldn't confidently find answer choices — add the question below.")
         : 'Could not find any text in that PDF — try a clearer scan, or type the question in below.';
-      examBeginQuestionSet(parsedList, extracted.passage, extracted.images);
+      examBeginQuestionSet(parsedList, extracted.passage, extracted.images, extracted.midPassages);
     } catch (e) {
       examPassageText = '';
       examRenderPassage();
