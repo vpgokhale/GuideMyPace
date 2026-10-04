@@ -3887,18 +3887,49 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     return true;
   }
 
+  // A BARE running page-number footer — "1 / 4", "(1 of 4)" — carries no reassuring word like
+  // "Page" at all, just the two raw numbers a template stamps at the very edge of every page, so
+  // EXAM_PAGE_HEADER_TRAILING_PAGE_RE above (which requires the literal word "page") never catches
+  // it. Left alone it glues onto whatever question starts the very next page exactly like the
+  // "Page N" case does — the user's own reported example: "1 / 4" sitting at the bottom of page 1
+  // became the first line in front of "6. To find your way across water or land." on page 2.
+  // Recognized structurally: the ENTIRE line (not just a trailing fragment, since there's no
+  // trailing fragment here — it IS the whole line) is nothing but a left number, a separator, and a
+  // right number — real question/option text is never reduced to just that. When the caller can
+  // supply the page's own 1-based number and the document's total page count (this page's own
+  // `pageNum`/`numPages`, threaded through from examStripPageHeaderFooterLines below), the two
+  // numbers are cross-checked against them, so a coincidental lone fraction sitting alone in real
+  // content (a math option reading just "1/4") only strips if it ALSO happens to equal this page's
+  // actual position in the actual document — vanishingly unlikely. Without that context
+  // (pageNum/numPages omitted) the structural match alone is still trusted, same as "Page N" above.
+  const EXAM_BARE_PAGE_NUMBER_RE = /^\(?\s*(\d{1,4})\s*(?:\/|of)\s*(\d{1,4})\s*\)?\.?$/i;
+  function examIsBarePageNumberLine(text, pageNum, numPages) {
+    const t = (text || '').trim();
+    if (!t) return false;
+    const m = t.match(EXAM_BARE_PAGE_NUMBER_RE);
+    if (!m) return false;
+    if (pageNum == null || numPages == null) return true;
+    return parseInt(m[1], 10) === pageNum && parseInt(m[2], 10) === numPages;
+  }
+
   // Strips a recognized running header from the TOP of a page's line list and a recognized running
   // footer from the BOTTOM, in place conceptually (returns a new array) — called once per page,
   // before table/image detection even sees the lines, so a header never has a chance to widen into a
   // phantom "image gap" candidate either. Deliberately only ever looks at the first and last lines:
   // a real header/footer is, by definition, the first or last thing on the page, never buried in the
-  // middle, so this can't accidentally reach into real content.
-  function examStripPageHeaderFooterLines(lines) {
+  // middle, so this can't accidentally reach into real content. `pageNum`/`numPages` are optional —
+  // passed by examExtractPdfText (this page's own 1-based number and the document's total page
+  // count) so examIsBarePageNumberLine above can cross-check a bare "N / M" footer against them;
+  // omitted, both checks still run on structural shape alone.
+  function examStripPageHeaderFooterLines(lines, pageNum, numPages) {
     if (!lines || !lines.length) return lines;
     let start = 0;
     let end = lines.length;
-    if (examIsPageHeaderLine(lines[start].text)) start++;
-    if (end > start && examIsPageHeaderLine(lines[end - 1].text)) end--;
+    function isHeaderOrFooter(text) {
+      return examIsPageHeaderLine(text) || examIsBarePageNumberLine(text, pageNum, numPages);
+    }
+    if (isHeaderOrFooter(lines[start].text)) start++;
+    if (end > start && isHeaderOrFooter(lines[end - 1].text)) end--;
     return start === 0 && end === lines.length ? lines : lines.slice(start, end);
   }
 
@@ -4391,7 +4422,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examPdfStatus.textContent = 'Reading page ' + pageNum + ' of ' + pdf.numPages + '…';
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const rawLines = examStripPageHeaderFooterLines(examItemsToLines(textContent.items));
+      const rawLines = examStripPageHeaderFooterLines(examItemsToLines(textContent.items), pageNum, pdf.numPages);
       const linesWithTables = await examDetectAndInsertPageTables(rawLines, page, extractedImages);
       const linesWithImages = await examDetectAndInsertPageImages(linesWithTables, page, extractedImages);
       const pageText = examJoinLinesWithParagraphGaps(examMergeStrayMarkerLines(linesWithImages)).trim();
