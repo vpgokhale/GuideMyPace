@@ -30,7 +30,7 @@
     --pending-ink: #333846;
     --correct-bg: #16a34a;
     --correct-ink: #ffffff;
-    --skipped-bg: #eab308;
+    --skipped-bg: rgba(234, 179, 8, 0.45);
     --skipped-ink: #3a2e00;
     --incorrect-bg: #dc2626;
     --incorrect-ink: #ffffff;
@@ -67,30 +67,6 @@
   body.mode-exam .wrap { max-width: 1080px; }
   h1 { font-size: 1.5rem; margin: 0 0 4px; }
   .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 0.95rem; }
-
-  .mode-switch {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 22px;
-  }
-  .mode-option {
-    flex: 1 1 220px;
-    display: block;
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    cursor: pointer;
-    background: var(--panel);
-    transition: border-color 0.15s ease, background 0.15s ease;
-  }
-  .mode-option:has(input:checked) {
-    border-color: var(--accent);
-    background: #eef0ff;
-  }
-  .mode-option input[type="radio"] { margin-right: 8px; }
-  .mode-option-label { font-weight: 700; font-size: 0.95rem; }
-  .mode-option-desc { display: block; margin: 2px 0 0 24px; color: var(--muted); font-size: 0.82rem; }
 
   #examWorkHeading, .exam-edit-heading {
     font-size: 1.1rem;
@@ -295,6 +271,18 @@
     min-height: 1.2em;
   }
   .status-line.warn { color: #b45309; }
+  .debug-capture-line {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #6d28d9;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
   .status-line.error { color: var(--danger); }
 
   .caption {
@@ -658,17 +646,6 @@
     line-height: var(--reading-line-height);
   }
 
-  .live-timer {
-    margin-top: 10px;
-    font-size: 0.85rem;
-    color: var(--muted);
-    display: none;
-    align-items: center;
-    gap: 8px;
-  }
-  .live-timer.show { display: flex; }
-  .live-timer b { color: var(--ink); font-variant-numeric: tabular-nums; }
-
   .legend {
     display: flex;
     gap: 18px;
@@ -684,36 +661,6 @@
   .swatch.incorrect { background: var(--incorrect-bg); }
   .swatch.pending { background: var(--pending-bg); border: 1px solid var(--border); }
 
-  .score-banner {
-    display: none;
-    margin-top: 16px;
-    padding: 14px 16px;
-    border-radius: 10px;
-    background: #eef2ff;
-    border: 1px solid #c7d2fe;
-    font-size: 0.95rem;
-  }
-  .score-banner b { font-size: 1.15rem; }
-
-  .timing-panel { display: none; margin-top: 16px; }
-  .timing-panel.show { display: block; }
-  .timing-panel h3 {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--muted);
-    margin: 0 0 10px;
-    font-weight: 700;
-  }
-  .insight-line {
-    font-size: 0.88rem;
-    color: var(--ink);
-    background: #f9fafb;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin-bottom: 10px;
-  }
   table.timing-table {
     width: 100%;
     border-collapse: collapse;
@@ -725,14 +672,6 @@
     border-bottom: 1px solid var(--border);
   }
   .timing-table th { color: var(--muted); font-weight: 600; }
-  .timing-table td.status-cell { font-weight: 600; }
-  .timing-table td.status-cell.correct { color: #15803d; }
-  .timing-table td.status-cell.skipped { color: #a16207; }
-  .timing-table td.status-cell.incorrect { color: #b91c1c; }
-  .timing-table td.status-cell.corrected { color: #0f766e; }
-  .timing-table td.status-cell.helped { color: #4d7c0f; }
-  .timing-table td.status-cell.echoed { color: #6d28d9; }
-  .timing-table tr.slow td { background: #fff7ed; }
 
   .btn-xs {
     padding: 4px 9px;
@@ -773,200 +712,59 @@
 <div class="wrap">
 
   <h1>🎙️ Guide My Pace</h1>
-  <p class="subtitle" id="subtitleText"></p>
-
-  <!-- Read mode is temporarily hidden (Exam mode only, for now) — to bring it back, remove the
-       `hidden` attribute below and move `checked` from modeExamRadio back to modeReadRadio. -->
-  <div class="mode-switch" role="radiogroup" aria-label="App mode" hidden>
-    <label class="mode-option">
-      <input type="radio" name="appMode" id="modeReadRadio" value="read">
-      <span class="mode-option-label">📖 Read mode</span>
-      <span class="mode-option-desc">Practice reading a passage aloud, with live correction.</span>
-    </label>
-    <label class="mode-option">
-      <input type="radio" name="appMode" id="modeExamRadio" value="exam" checked>
-      <span class="mode-option-label">📝 Exam mode</span>
-      <span class="mode-option-desc">Guided support for working through a test.</span>
-    </label>
-  </div>
+  <p class="subtitle" id="subtitleText">Load a question set, then work through it with paced support. May include passages, images, and tables.</p>
 
   <div class="unsupported" id="unsupported">
     Your browser doesn't support live speech recognition (the Web Speech API), so it can't listen and check your answers — <b>this is a Safari limitation</b> (Safari has never implemented this API, on desktop or iOS). Reading prompts aloud (text-to-speech) still works here, but for the full experience — listening to you read questions and answer choices — use <b>Google Chrome</b> or <b>Microsoft Edge</b> on desktop, with an internet connection and microphone access.
   </div>
 
 
-  <div id="readModeSection">
 
-  <div class="card">
-    <details class="table-toggle settings-toggle">
-      <summary>⚙️ Typography settings</summary>
-      <div class="table-toggle-body">
-        <p style="font-size:0.85rem;color:var(--muted);margin:0 0 10px;">Starts out set to OpenDyslexic, a commonly-used dyslexia-friendly font, with extra spacing and line height — adjust anything below to taste.</p>
-        <div class="typo-grid">
-          <div class="typo-field">
-            <label for="fontSelect">Font</label>
-            <select id="fontSelect">
-              <option value="'OpenDyslexic', Verdana, Arial, sans-serif" selected>OpenDyslexic (default)</option>
-              <option value="'Atkinson Hyperlegible', Verdana, Arial, sans-serif">Atkinson Hyperlegible</option>
-              <option value="'Lexend', Verdana, Arial, sans-serif">Lexend</option>
-              <option value="Verdana, Arial, sans-serif">Verdana</option>
-              <option value="'Comic Sans MS', 'Comic Sans', cursive, sans-serif">Comic Sans MS</option>
-              <option value="Arial, Helvetica, sans-serif">Arial</option>
-              <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">System default</option>
-            </select>
+  <div id="examModeSection">
+
+    <!-- Typography settings — applies everywhere text is shown (question stems, answer choices,
+         and the passage), via the shared --reading-font/--letter-spacing/--word-spacing/
+         --reading-line-height CSS variables that .reading-area (used by all three) reads from.
+         Ported over from the old Read-mode-only reading coach, unchanged, when that mode was
+         retired — nothing here is exam-specific, so it moved as-is rather than being rebuilt. -->
+    <div class="card">
+      <details class="table-toggle settings-toggle">
+        <summary>⚙️ Typography settings</summary>
+        <div class="table-toggle-body">
+          <p style="font-size:0.85rem;color:var(--muted);margin:0 0 10px;">Starts out set to OpenDyslexic, a commonly-used dyslexia-friendly font, with extra spacing and line height — adjust anything below to taste.</p>
+          <div class="typo-grid">
+            <div class="typo-field">
+              <label for="fontSelect">Font</label>
+              <select id="fontSelect">
+                <option value="'OpenDyslexic', Verdana, Arial, sans-serif" selected>OpenDyslexic (default)</option>
+                <option value="'Atkinson Hyperlegible', Verdana, Arial, sans-serif">Atkinson Hyperlegible</option>
+                <option value="'Lexend', Verdana, Arial, sans-serif">Lexend</option>
+                <option value="Verdana, Arial, sans-serif">Verdana</option>
+                <option value="'Comic Sans MS', 'Comic Sans', cursive, sans-serif">Comic Sans MS</option>
+                <option value="Arial, Helvetica, sans-serif">Arial</option>
+                <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">System default</option>
+              </select>
+            </div>
+            <div class="typo-field">
+              <label for="letterSpacingRange">Character spacing <span class="value" id="letterSpacingValue">0.06em</span></label>
+              <input type="range" id="letterSpacingRange" min="0" max="0.25" step="0.01" value="0.06">
+            </div>
+            <div class="typo-field">
+              <label for="wordSpacingRange">Word spacing <span class="value" id="wordSpacingValue">+0.3em</span></label>
+              <input type="range" id="wordSpacingRange" min="0" max="1" step="0.05" value="0.3">
+            </div>
+            <div class="typo-field">
+              <label for="lineHeightRange">Line spacing <span class="value" id="lineHeightValue">1.8×</span></label>
+              <input type="range" id="lineHeightRange" min="1.2" max="3" step="0.1" value="1.8">
+            </div>
           </div>
-          <div class="typo-field">
-            <label for="letterSpacingRange">Character spacing <span class="value" id="letterSpacingValue">0.06em</span></label>
-            <input type="range" id="letterSpacingRange" min="0" max="0.25" step="0.01" value="0.06">
+          <div class="row">
+            <button class="btn-secondary" id="resetTypoBtn">Reset to Defaults</button>
           </div>
-          <div class="typo-field">
-            <label for="wordSpacingRange">Word spacing <span class="value" id="wordSpacingValue">+0.3em</span></label>
-            <input type="range" id="wordSpacingRange" min="0" max="1" step="0.05" value="0.3">
-          </div>
-          <div class="typo-field">
-            <label for="lineHeightRange">Line spacing <span class="value" id="lineHeightValue">1.8×</span></label>
-            <input type="range" id="lineHeightRange" min="1.2" max="3" step="0.1" value="1.8">
-          </div>
+          <div class="typo-preview" id="typoPreview">The quick brown fox jumps over the lazy dog.</div>
         </div>
-        <div class="row">
-          <button class="btn-secondary" id="resetTypoBtn">Reset to Defaults</button>
-        </div>
-        <div class="typo-preview" id="typoPreview">The quick brown fox jumps over the lazy dog.</div>
-      </div>
-    </details>
-  </div>
-
-  <div class="card">
-    <h2>1 · Text to practice</h2>
-    <textarea id="sourceText">The quick brown fox jumps over the lazy dog. Reading aloud every day helps build confidence and fluency.
-
-Try pasting in a passage with a few paragraphs — a blank line between them, like the one above, will show up as a paragraph break here too.</textarea>
-    <label class="field-label" for="studentName">Student name (optional — tags this session in the log below)</label>
-    <input type="text" id="studentName" class="text-input" placeholder="e.g. Priya">
-    <label class="field-label" for="gradeLevelSelect">Grade level (optional — enables a DIBELS-style fluency benchmark and overall Lexile® estimate)</label>
-    <select id="gradeLevelSelect" class="text-input">
-      <option value="" selected>Not set — skip benchmark</option>
-      <option value="K">Kindergarten</option>
-      <option value="1">Grade 1</option>
-      <option value="2">Grade 2</option>
-      <option value="3">Grade 3</option>
-      <option value="4">Grade 4</option>
-      <option value="5">Grade 5</option>
-      <option value="6">Grade 6</option>
-      <option value="7">Grade 7</option>
-      <option value="8">Grade 8</option>
-    </select>
-    <div class="row">
-      <button class="btn-primary" id="loadBtn">Load text</button>
+      </details>
     </div>
-  </div>
-
-  <div class="card">
-    <h2>2 · Read it aloud</h2>
-    <div class="reading-area" id="readingArea"></div>
-
-    <div class="legend">
-      <span><i class="swatch pending"></i> not yet read</span>
-      <span><i class="swatch" style="background:#dbeafe;box-shadow:0 0 0 1.5px var(--accent);"></i> active — waiting for speech</span>
-      <span><i class="swatch correct"></i> correct</span>
-      <span><i class="swatch" style="background:#65a30d"></i> correct with help</span>
-      <span><i class="swatch" style="background:#7c3aed"></i> correct after choral prompt</span>
-      <span><i class="swatch skipped"></i> skipped</span>
-      <span><i class="swatch incorrect"></i> incorrect</span>
-      <span><i class="swatch" style="background:#0d9488"></i> auto-corrected (2nd pass)</span>
-      <span><i class="swatch" style="background:#e0e7ff;box-shadow:0 0 0 1.5px #818cf8;"></i> sounding out…</span>
-    </div>
-
-    <div class="cover-controls">
-      <label class="cover-toggle-label">
-        <input type="checkbox" id="helperModeToggle">
-        Helper mode
-      </label>
-      <span class="color-field">
-        Read the word aloud after
-        <select id="helperDelaySelect">
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5" selected>5</option>
-          <option value="6">6</option>
-          <option value="8">8</option>
-          <option value="10">10</option>
-          <option value="15">15</option>
-        </select>
-        seconds of waiting
-      </span>
-      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Uses your device's built-in text-to-speech; if the reader then repeats the word, it's marked correct — with help, shown in a different green. The reader can also click the highlighted word any time to ask for help right away, instead of waiting.</div></details>
-    </div>
-
-    <div class="cover-controls">
-      <label class="cover-toggle-label">
-        <input type="checkbox" id="choralModeToggle">
-        Choral mode
-      </label>
-      <span class="color-field">
-        Reading pace:
-        <input type="number" id="choralWcpmInput" min="20" max="220" step="5" value="100" style="width:4.5em">
-        WCPM
-      </span>
-      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">The device leads: it reads a short phrase (2–3 words) aloud using its built-in text-to-speech, then waits for the reader to repeat it back before reading the next phrase. Unlike Helper mode, this isn't triggered by getting stuck — the device sets the pace the whole time, at the words-per-minute rate above. Turning this on turns off Helper mode, since the device is already leading.</div></details>
-    </div>
-
-    <div class="cover-controls">
-      <label class="cover-toggle-label">
-        <input type="checkbox" id="coverToggle">
-        Cover unread text
-      </label>
-      <span class="color-field">
-        Block color:
-        <input type="color" id="maskColorPicker" value="#9ca3af">
-      </span>
-      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Blocks out the rest of the line and every line below it, so only what's already been read stays visible.</div></details>
-    </div>
-
-    <div class="cover-controls" id="revealControls" hidden>
-      <span class="color-field">
-        Words ahead on this line to reveal:
-        <select id="revealWordsSelect">
-          <option value="0" selected>0</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-        </select>
-      </span>
-      <span class="color-field">
-        Lines below to reveal:
-        <select id="revealLinesSelect">
-          <option value="0" selected>0</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-        </select>
-      </span>
-      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Raise these gradually to fade the cover back as the reader needs less support.</div></details>
-    </div>
-
-    <div class="row">
-      <button class="btn-primary mic-btn" id="micBtn"><span class="mic-dot" id="micDot"></span><span id="micLabel">Start reading</span></button>
-      <button class="btn-secondary" id="resetBtn">Reset highlights</button>
-      <button class="btn-danger" id="finishBtn">Finish &amp; score</button>
-    </div>
-
-    <div class="status-line" id="statusLine">Load some text above, then press "Start reading" and read it out loud.</div>
-    <div class="caption" id="caption"></div>
-    <div class="live-timer" id="liveTimer">On current word: <b id="liveTimerValue">0.0s</b></div>
-
-    <div class="score-banner" id="scoreBanner"></div>
-    <div class="timing-panel" id="timingPanel"></div>
-    <div class="timing-panel" id="analysisPanel"></div>
-  </div>
-
-  </div><!-- /#readModeSection -->
-
-  <div id="examModeSection" hidden>
 
     <!-- Stage: load a PDF and get its text out -->
     <div class="card">
@@ -1024,6 +822,46 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               </label>
               <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Experimental. When checked, Speaker mode breaks what it reads into short phrases with a brief pause between each one, instead of one continuous sentence — closer to how a person naturally reads aloud. Off by default; only affects Speaker mode's own TTS playback.</div></details>
             </span>
+          </div>
+
+          <!-- Exam-mode's own helper mode: mirrors Read mode's helper mode (if the reader hasn't
+               produced the current word a few seconds after listening starts, the device reads it
+               aloud as a prompt) but applies it to whichever target — stem, option, or passage —
+               the shared exam engine is currently reading (see examScheduleHelperTimer). This
+               checkbox gates only the AUTOMATIC silence-triggered prompt and the automatic "still
+               stuck — move on" follow-up that comes with it. A reader can still always ask for help
+               on the current word by clicking it directly, regardless of this setting — see
+               examRequestHelpForWord. Unchecked by default — only turns on the automatic prompting
+               when the reader explicitly opts in. Only applies when Speaker mode (above) is off,
+               since Speaker mode already reads everything aloud on its own. -->
+          <div class="cover-controls">
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examHelperModeToggle">
+              Helper mode
+            </label>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Unchecked (default): the reader can still always click the current word for help manually. Check this to also have the device prompt automatically — if the reader hasn't said the current word a few seconds after Play starts, the device reads it aloud, and if it's still not resolved a few seconds after that, moves on automatically so the reader is never stuck waiting.</div></details>
+          </div>
+
+          <!-- Exam-mode's own choral mode: mirrors Read mode's choral mode (the device reads a
+               short phrase aloud first, then the reader repeats it back) — see
+               examMaybeNarrateChoralChunk. A fresh, independent implementation from Read mode's own
+               choral functions (different word source, and deliberately skips Read mode's
+               NLP-based phrase-boundary hinting — see that function's own comment for why), applied
+               generically across stem/option/passage the same way Helper mode above is. Off by
+               default, matching Read mode's own default. Only applies when Speaker mode is off. -->
+          <!-- Hidden for now (UI only — the toggle stays unchecked, so Choral mode itself stays off;
+               all its underlying logic is untouched and this can be un-hidden later by removing the
+               `hidden` attribute below). -->
+          <div class="cover-controls" hidden>
+            <label class="cover-toggle-label">
+              <input type="checkbox" id="examChoralModeToggle">
+              Choral mode
+            </label>
+            <span class="color-field">
+              Target WCPM:
+              <input type="number" id="examChoralWcpmInput" min="20" max="220" step="5" value="100" style="width:4.5em">
+            </span>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">When checked and Speaker mode is off: before listening for each short phrase (2–3 words), the device reads it aloud first at the pace set by Target WCPM, then the reader repeats it back — marked "correct after choral prompt" rather than plain correct. Off by default.</div></details>
           </div>
 
           <!-- Passage-only "cover unread text" scaffolding, mirroring Read mode's own cover
@@ -1116,7 +954,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
               <input type="checkbox" id="examDebugModeToggle">
               Debug mode
             </label>
-            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Off by default. When checked, pressing Submit also logs the session and automatically downloads a word-level CSV, in addition to the PDF. Leave unchecked for a plain PDF-only submission.</div></details>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Off by default. When checked: pressing Submit also logs the session and automatically downloads a word-level CSV, in addition to the PDF. (The live transcript of what the microphone is picking up — shown right under whichever "Listening…" status line is active — isn't tied to this anymore; it's always there in Read/listen mode, and now included in the exported PDF too.)</div></details>
           </div>
 
           <label class="field-label">Highlight Color Key</label>
@@ -1125,6 +963,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
             <span><i class="swatch" style="background:#dbeafe;box-shadow:0 0 0 1.5px var(--accent);"></i> active — waiting for speech</span>
             <span><i class="swatch correct"></i> correct</span>
             <span><i class="swatch" style="background:#65a30d"></i> correct with help</span>
+            <span><i class="swatch" style="background:#7c3aed"></i> correct after choral prompt</span>
             <span><i class="swatch skipped"></i> skipped</span>
             <span><i class="swatch incorrect"></i> incorrect</span>
             <span><i class="swatch text-match-swatch"></i> Text Match (shared with question)</span>
@@ -1157,6 +996,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
             <div class="reading-area" id="examPassageArea"></div>
           </div>
           <div class="status-line" id="examPassageStatus"></div>
+          <!-- Shown by default in Read/listen mode (see examDebugRenderCapture) — a running
+               transcript of everything picked up while listening to the passage, so it's visible
+               right where the reading is actually happening rather than tucked away in a settings
+               panel. Hidden in Speaker mode, where there's nothing being listened to. -->
+          <div class="status-line debug-capture-line" id="examDebugCapturePassage" hidden></div>
         </div>
       </details>
     </div>
@@ -1191,6 +1035,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       </div>
       <div id="examQuestionImages" class="exam-question-images" hidden></div>
       <div class="status-line" id="examQuestionStatus"></div>
+      <!-- Shown by default in Read/listen mode — see examDebugCapturePassage's comment above. -->
+      <div class="status-line debug-capture-line" id="examDebugCaptureQuestion" hidden></div>
 
       <div id="examNotesBlock" hidden>
         <label class="field-label" for="examNotesInput">Notes — jot down your thinking</label>
@@ -1208,6 +1054,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
       <div id="examAnswerBlock" hidden>
         <div class="status-line" id="examAnswerStatus"></div>
+        <!-- Shown by default in Read/listen mode — see examDebugCapturePassage's comment above. -->
+        <div class="status-line debug-capture-line" id="examDebugCaptureOption" hidden></div>
       </div>
 
       <div id="examSubmitBlock" hidden>
@@ -1226,23 +1074,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
     </div>
 
-  </div>
-
-  <div class="card" id="sessionLogCard">
-    <div class="card-heading">
-      <h2>3 · Session log</h2>
-      <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Every time you finish a passage, a row is added here — export it to review a batch of results for one student.</div></details>
-    </div>
-    <div class="log-status-line" id="logStatusLine"></div>
-    <div style="overflow-x:auto"><table class="timing-table" id="logTable"><thead><tr>
-      <th>When</th><th>Student</th><th>Score</th><th>Words</th><th>WCPM</th><th></th>
-    </tr></thead><tbody id="logTableBody"></tbody></table></div>
-    <div class="row">
-      <button class="btn-secondary" id="exportWordCsvBtn">Export word-level CSV</button>
-      <button class="btn-secondary" id="exportSessionCsvBtn">Export session summary CSV</button>
-      <button class="btn-secondary" id="exportJsonBtn">Export JSON</button>
-      <button class="btn-danger" id="clearLogBtn">Clear log</button>
-    </div>
   </div>
 
   <div class="card" id="examSessionLogCard" hidden>
@@ -1268,9 +1099,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   </footer>
 </div>
 
-<!-- Optional: powers choral mode's phrase-boundary detection (part-of-speech tags, noun/verb
-     phrases) via computeChoralHints() below. If this fails to load — no internet, CDN blocked —
-     choral mode just falls back to its plain 2-3 word / punctuation rule; nothing else breaks. -->
+<!-- Optional: powers Natural Language mode's phrase-boundary detection (part-of-speech tags,
+     noun/verb phrases) via examComputePhraseHints() below. If this fails to load — no internet,
+     CDN blocked — Natural Language mode just falls back to its plain 2-3 word / punctuation rule;
+     nothing else breaks. -->
 <script src="https://unpkg.com/compromise@14.14.4"></script>
 
 <!-- Exam mode: PDF.js extracts embedded text from a digital PDF; Tesseract.js OCRs a page when
@@ -1290,24 +1122,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   "use strict";
 
   // ---------- DOM ----------
-  const sourceText   = document.getElementById('sourceText');
-  const loadBtn      = document.getElementById('loadBtn');
-  const readingArea  = document.getElementById('readingArea');
-  const micBtn       = document.getElementById('micBtn');
-  const micDot       = document.getElementById('micDot');
-  const micLabel     = document.getElementById('micLabel');
-  const resetBtn     = document.getElementById('resetBtn');
-  const finishBtn    = document.getElementById('finishBtn');
-  const statusLine   = document.getElementById('statusLine');
-  const captionEl    = document.getElementById('caption');
-  const scoreBanner  = document.getElementById('scoreBanner');
   const unsupported  = document.getElementById('unsupported');
-  const subtitleText = document.getElementById('subtitleText');
-  const modeReadRadio    = document.getElementById('modeReadRadio');
-  const modeExamRadio    = document.getElementById('modeExamRadio');
-  const readModeSection  = document.getElementById('readModeSection');
-  const examModeSection  = document.getElementById('examModeSection');
-  const sessionLogCard   = document.getElementById('sessionLogCard');
   const examSessionLogCard = document.getElementById('examSessionLogCard');
   const examStudentNameInput = document.getElementById('examStudentName');
   const examLogStatusLine  = document.getElementById('examLogStatusLine');
@@ -1354,26 +1169,13 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const examSubmitStatus  = document.getElementById('examSubmitStatus');
   const examExportFileNameInput = document.getElementById('examExportFileName');
   const examSubmitBtn     = document.getElementById('examSubmitBtn');
-  const liveTimer      = document.getElementById('liveTimer');
-  const liveTimerValue = document.getElementById('liveTimerValue');
-  const timingPanel    = document.getElementById('timingPanel');
-  const analysisPanel  = document.getElementById('analysisPanel');
-  const studentNameInput = document.getElementById('studentName');
-  const gradeLevelSelect = document.getElementById('gradeLevelSelect');
-  const logStatusLine  = document.getElementById('logStatusLine');
-  const logTableBody   = document.getElementById('logTableBody');
-  const exportWordCsvBtn    = document.getElementById('exportWordCsvBtn');
-  const exportSessionCsvBtn = document.getElementById('exportSessionCsvBtn');
-  const exportJsonBtn       = document.getElementById('exportJsonBtn');
-  const clearLogBtn         = document.getElementById('clearLogBtn');
-  const helperModeToggle  = document.getElementById('helperModeToggle');
-  const helperDelaySelect = document.getElementById('helperDelaySelect');
-  const choralModeToggle  = document.getElementById('choralModeToggle');
-  const choralWcpmInput   = document.getElementById('choralWcpmInput');
   const ttsVoiceSelect    = document.getElementById('ttsVoiceSelect');
   const examSpeakerModeToggle = document.getElementById('examSpeakerModeToggle');
   const examSpeakerRateSelect = document.getElementById('examSpeakerRateSelect');
   const examNaturalLanguageToggle = document.getElementById('examNaturalLanguageToggle');
+  const examHelperModeToggle = document.getElementById('examHelperModeToggle');
+  const examChoralModeToggle = document.getElementById('examChoralModeToggle');
+  const examChoralWcpmInput = document.getElementById('examChoralWcpmInput');
   const examPassageCoverToggle = document.getElementById('examPassageCoverToggle');
   const examPassageMaskColorPicker = document.getElementById('examPassageMaskColorPicker');
   const examPassageRevealControls = document.getElementById('examPassageRevealControls');
@@ -1382,11 +1184,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   const examTextMatchToggle = document.getElementById('examTextMatchToggle');
   const examMarkupToggle = document.getElementById('examMarkupToggle');
   const examDebugModeToggle = document.getElementById('examDebugModeToggle');
-  const coverToggle    = document.getElementById('coverToggle');
-  const maskColorPicker = document.getElementById('maskColorPicker');
-  const revealControls   = document.getElementById('revealControls');
-  const revealWordsSelect = document.getElementById('revealWordsSelect');
-  const revealLinesSelect = document.getElementById('revealLinesSelect');
+  const examDebugCaptureQuestion = document.getElementById('examDebugCaptureQuestion');
+  const examDebugCaptureOption = document.getElementById('examDebugCaptureOption');
+  const examDebugCapturePassage = document.getElementById('examDebugCapturePassage');
   const fontSelect          = document.getElementById('fontSelect');
   const letterSpacingRange  = document.getElementById('letterSpacingRange');
   const wordSpacingRange    = document.getElementById('wordSpacingRange');
@@ -1403,33 +1203,12 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   };
 
   // ---------- state ----------
-  let words = [];       // [{ raw, norm, status, attempts, firstSeenAt, resolvedAt, durationMs }]
-  let pointer = 0;       // index of next unresolved word
-  let helperTimerHandle = null; // pending "read it aloud" timeout for the current word, when helper mode is on
-  let choralChunks = [];        // [{start, end}] word-index ranges the passage is grouped into for choral mode
-  let choralNarratedChunkEnd = -1; // end index of the last choral chunk already read aloud, so it isn't repeated
   let ttsSpeaking = false;      // true while the device is actively speaking (helper or choral prompt)
   let availableVoices = [];     // cached speechSynthesis.getVoices() result, refreshed on onvoiceschanged
   let muteRecognitionUntil = 0; // Date.now() timestamp; ignore recognition results until this passes, so the
                                  // mic doesn't pick up the tail of the device's own voice as if it were the reader
-  let isListening = false;
-  let userStopped = true; // true when the user hasn't asked to listen (guards auto-restart)
-  let lastWcpm = null;     // words-correct-per-minute from the most recently finished session
-  let lastElapsedMs = null;
-  let lastOverallLexile = null; // fluency-based overall Lexile estimate for the most recent session
-  let lastBenchmark = null;     // DIBELS-style benchmark status vs. the selected grade, if any
-  let lastGradeLevel = null;
-  let recognition = null;
-  let liveTimerHandle = null;
-  let lastFinalEventTime = null; // wall-clock time of the previous finalized speech chunk, for interpolating per-word timestamps
-  let interimCommitted = [];     // per speech-recognition result index: how many of its words we've already processed (via the fast interim path or the final path)
-  let loadedRawText = '';        // the exact text last loaded, kept for the session log
-  let loggedThisAttempt = false; // guards against double-logging if Finish is pressed more than once
-  let sessionLog = [];           // every completed reading, persisted locally (best-effort) for export/post-processing
-  const LOG_STORAGE_KEY = 'readingCoachSessionLog_v1';
-  let examSessionLog = [];       // Exam mode's own persisted log, one entry per Submit — same idea as
-                                  // sessionLog above (persisted locally, exportable), kept in its own
-                                  // array/storage key so the two modes' logs never mix.
+  let examSessionLog = [];       // Exam mode's own persisted log, one entry per Submit — persisted
+                                  // locally (best-effort) and exportable.
   const EXAM_LOG_STORAGE_KEY = 'guideMyPaceExamSessionLog_v1';
   const EXAM_LOG_STORAGE_KEY_LEGACY_CUEFORWARD = 'cueForwardExamSessionLog_v1'; // pre-rename key —
   const EXAM_LOG_STORAGE_KEY_LEGACY_QALONG = 'qAlongExamSessionLog_v1';        // and the one before
@@ -1492,9 +1271,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   let examEngineTarget = null;      // 'question' | 'option' — which view to re-render on each update
   let examEngineOnDone = null;
   let examEngineRecognition = null;
-  let examEngineCorrectionWord = null; // a skipped word currently "offered" for correction via TTS —
-                                        // set null again once it's repeated correctly (-> helped) or a
-                                        // new correction is offered
+  let examEngineCorrectionWords = []; // skipped words currently "offered" for correction — each one
+                                       // removed again once it's repeated correctly (-> helped). Every
+                                       // word a skip-ahead jumps over gets added here (not just when
+                                       // exactly one word is skipped), so a reader who circles back to
+                                       // say a word they skipped several words ago still gets credit
+                                       // for it instead of that attempt either being silently lost or
+                                       // (worse) wrongly charged against whatever word the pointer has
+                                       // since moved on to.
   // Speaker mode: the device reads the question/option aloud via TTS instead of listening for the
   // reader's own speech through examEngineRecognition — same reveal flow (see examEngineStartSpeaker/
   // examEngineSpeakerFinish below), just driven by playback finishing rather than STT scoring every
@@ -1543,7 +1327,145 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // does Submit also write to the persistent session log and auto-download the word-level CSV —
   // everyday use just wants the PDF, and the debug artifacts are for troubleshooting only.
   let examDebugMode = false;
+  // Running transcript of everything the recognizer has heard (and actually used for matching —
+  // muted stretches are excluded) since the current target was loaded/restarted. Shown by default
+  // in Read/listen mode (see examDebugRenderCapture) — kept up to date even while briefly hidden
+  // (e.g. a moment in Speaker mode), so switching back to Read/listen mode shows the full history
+  // rather than only whatever comes next.
+  let examDebugHeardSoFar = '';
   const EXAM_PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // Persisted copy of the running transcript, one per owner (each question's stem, each answer
+  // choice, and the passage) rather than just the single live examDebugHeardSoFar accumulator —
+  // that one gets overwritten every time the engine switches target, so without this, only
+  // whichever target was most recently listened to would still have its transcript around by the
+  // time Submit builds the PDF. examPassageHeardTranscript covers the passage; question stems and
+  // answer choices get their `heardTranscript` property set directly on the question/option object
+  // they already live on (see examDebugSyncOwnerTranscript), so each one's history travels with it
+  // automatically — no separate lookup table to keep in sync.
+  let examPassageHeardTranscript = '';
+  function examDebugSyncOwnerTranscript(text) {
+    if (examEngineTarget === 'question') {
+      const q = examActiveQuestion();
+      if (q) q.heardTranscript = text;
+    } else if (examEngineTarget === 'option') {
+      const q = examActiveQuestion();
+      if (q && examCurrentOptionIndex >= 0 && q.options[examCurrentOptionIndex]) {
+        q.options[examCurrentOptionIndex].heardTranscript = text;
+      }
+    } else if (examEngineTarget === 'passage') {
+      examPassageHeardTranscript = text;
+    }
+  }
+
+  // Appends one word to the running transcript — called from examProcessWord as each heard word is
+  // resolved, using whichever text best represents it: the MATCHED target word's own `.raw` (with
+  // its original punctuation, e.g. "water?") when the heard word resolved against one, or the bare
+  // recognized word itself when it didn't (a genuine wrong attempt, or ASR noise). Continuous speech
+  // recognition rarely returns trailing punctuation of its own for a short recognized phrase, so
+  // without this the transcript would show "water" even when the actual target word is "water?".
+  function examDebugAppendHeard(text) {
+    examDebugHeardSoFar = (examDebugHeardSoFar + ' ' + text).trim();
+    examDebugSyncOwnerTranscript(examDebugHeardSoFar);
+  }
+
+  // Debug mode's live-capture lines: one lives right under each of the three "Listening…" status
+  // lines (question stem, answer choice, passage). The stem and the answer choices each keep a
+  // permanent on-screen LOG of every read session rather than just whatever's being read right now
+  // — moving on to a different answer choice (or back to the stem) no longer erases what was there
+  // before, and replaying the very same choice again just adds another line instead of overwriting
+  // the one already there. Each area is shown as soon as it has anything to show and then stays
+  // visible — including while a DIFFERENT target is the one currently being read — so everything
+  // read on this question is visible together, not just whichever one is active right now. The
+  // passage deliberately has no log of its own: Stop/Resume there already continues the SAME running
+  // line rather than starting a new one (see examEngineResumePassage), so examPassageHeardTranscript
+  // (kept in sync by examDebugSyncOwnerTranscript) already is its one persistent line.
+  let examDebugQuestionLog = []; // finalized transcript lines for the stem, oldest first — reset per question
+  let examDebugOptionLog = [];   // finalized, labeled transcript lines for every answer choice read so far
+                                  // this question, in the order they were read — reset per question
+  function examDebugOptionLabel(idx) { return 'Option ' + String.fromCharCode(65 + idx) + ': '; }
+
+  // Call this right BEFORE switching the engine to a new target/session (a fresh Play press for the
+  // stem or an answer choice) — archives whatever the PREVIOUS session accumulated into that area's
+  // permanent log before examEngineLoad resets the live accumulator out from under it. Must run
+  // while examEngineTarget/examCurrentOptionIndex still describe the session that's ENDING, so every
+  // caller invokes it before reassigning either of those. A no-op when nothing was accumulated yet,
+  // and for the passage (which isn't logged — see above).
+  //
+  // Also archives into the owning question/option object's own `heardTranscriptLines` array (not
+  // just the on-screen log above), so every past reading survives question navigation too and makes
+  // it into the exported PDF — not just whichever one happened to be read last (see examExportPdf's
+  // use of examPdfOwnerHeardLines). `heardTranscript` (singular) is cleared right after archiving so
+  // the two never double-count: a non-empty `heardTranscript` always means "live, not yet archived".
+  function examDebugFinalizeLog() {
+    if (!examDebugHeardSoFar || !examDebugHeardSoFar.trim()) return;
+    const text = examDebugHeardSoFar.trim();
+    if (examEngineTarget === 'question') {
+      examDebugQuestionLog.push(text);
+      const q = examActiveQuestion();
+      if (q) {
+        q.heardTranscriptLines = (q.heardTranscriptLines || []).concat([text]);
+        q.heardTranscript = '';
+      }
+    } else if (examEngineTarget === 'option' && examCurrentOptionIndex >= 0) {
+      examDebugOptionLog.push(examDebugOptionLabel(examCurrentOptionIndex) + text);
+      const q = examActiveQuestion();
+      const opt = q && q.options[examCurrentOptionIndex];
+      if (opt) {
+        opt.heardTranscriptLines = (opt.heardTranscriptLines || []).concat([text]);
+        opt.heardTranscript = '';
+      }
+    }
+  }
+
+  // Clears both logs (a fresh question has nothing to show yet) and hides the stem/option areas —
+  // called from examShowQuestion. The passage isn't touched here: it isn't scoped to one question
+  // the same way (several consecutive questions can share one passage) and already manages its own
+  // single line independently (examPassageHeardTranscript / examEngineResumePassage).
+  function examDebugResetLogs() {
+    examDebugQuestionLog = [];
+    examDebugOptionLog = [];
+    examDebugCaptureQuestion.hidden = true;
+    examDebugCaptureQuestion.textContent = '';
+    examDebugCaptureOption.hidden = true;
+    examDebugCaptureOption.textContent = '';
+  }
+
+  // `text` is the full live string for whichever target is CURRENTLY active (already includes any
+  // live interim tail) — pass '' (or leave it the accumulator's current value) to fall back to a
+  // "Listening…"/"(not listening)" placeholder depending on whether the engine is actually running.
+  // Shown by default whenever Speaker mode is off (there's nothing live to show IN Speaker mode —
+  // the device is reading, not listening) — no longer gated behind Debug mode, which now only
+  // controls the CSV/session-log side effects on Submit. Speaker mode hides all three areas outright
+  // (their underlying log/transcript data is untouched, just not worth showing while nothing's being
+  // listened to) — switching back to Read/listen mode brings everything back via the next call here.
+  function examDebugRenderCapture(text) {
+    if (examSpeakerMode) {
+      examDebugCaptureQuestion.hidden = true;
+      examDebugCaptureOption.hidden = true;
+      examDebugCapturePassage.hidden = true;
+      return;
+    }
+    const liveLine = (text && text.trim())
+      ? text.trim()
+      : (examEngineListening ? 'Listening…' : '(not listening)');
+
+    const questionLines = examDebugQuestionLog.slice();
+    if (examEngineTarget === 'question') questionLines.push(liveLine);
+    examDebugCaptureQuestion.hidden = questionLines.length === 0;
+    examDebugCaptureQuestion.textContent = questionLines.join('\n');
+
+    const optionLines = examDebugOptionLog.slice();
+    if (examEngineTarget === 'option' && examCurrentOptionIndex >= 0) {
+      optionLines.push(examDebugOptionLabel(examCurrentOptionIndex) + liveLine);
+    }
+    examDebugCaptureOption.hidden = optionLines.length === 0;
+    examDebugCaptureOption.textContent = optionLines.join('\n');
+
+    const passageText = examEngineTarget === 'passage' ? liveLine : examPassageHeardTranscript;
+    examDebugCapturePassage.hidden = !passageText;
+    examDebugCapturePassage.textContent = passageText || '';
+  }
 
   // ---------- helpers ----------
   function normalize(w) {
@@ -1599,433 +1521,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // Is `spokenNorm` a plausible in-progress fragment of `targetNorm`? (i.e. the reader is
   // sounding it out — a prefix, or a syllable-sized chunk found anywhere in the word — rather
   // than a completed attempt at a different word.)
-  function isPartialAttempt(targetNorm, spokenNorm) {
-    if (!targetNorm || !spokenNorm) return false;
-    if (targetNorm.length < 3) return false;           // too short a target to "sound out"
-    if (spokenNorm.length >= targetNorm.length) return false; // not a shorter fragment
-    const threshold = Math.max(1, Math.round(spokenNorm.length * 0.4));
-    for (let offset = 0; offset <= targetNorm.length - spokenNorm.length; offset++) {
-      const chunk = targetNorm.substr(offset, spokenNorm.length);
-      if (levenshtein(spokenNorm, chunk) <= threshold) return true;
-    }
-    return false;
-  }
-
-  // ---------- missed-word analysis: rough phonics-pattern & Lexile-band heuristics ----------
-  // These are spelling-pattern regexes, not a real phonics assessment or a leveled word list —
-  // good enough to point at "what to review," not a diagnosis. See fmtDuration-adjacent notes
-  // rendered in the analysis panel for the same caveat, surfaced to the user.
-  function estimateSyllables(rawWord) {
-    const w = rawWord.toLowerCase().replace(/[^a-z]/g, '');
-    if (!w) return 0;
-    if (w.length <= 3) return 1;
-    // words like "little" or "table" end in a consonant + silent-e that actually carries its
-    // own syllable (lit-tle, ta-ble) — the general silent-e strip below would otherwise miss it
-    const endsInConsonantLe = /[bcdfghjklmnpqrstvwxyz]le$/.test(w);
-    const s = w.replace(/e$/, '').replace(/^y/, '');
-    const groups = s.match(/[aeiouy]+/g);
-    let count = groups ? groups.length : 0;
-    if (endsInConsonantLe) count += 1;
-    return Math.max(1, count);
-  }
-
-  // Maps the same syllable-count heuristic used before, but expressed as an approximate Lexile®
-  // range instead of a grade band — the boundaries come from MetaMetrics' published Spring
-  // 50th-percentile "Lexile Student Measures by Grade" for the grade span each syllable count
-  // roughly corresponds to (K–1, 2–3, 4–5, 6+). This is a word-difficulty proxy, not a real
-  // Lexile measurement — Lexile scores come from analyzing whole passages (sentence length +
-  // word frequency), not single isolated words.
-  function estimateLexileBand(rawWord) {
-    const syl = estimateSyllables(rawWord);
-    if (syl <= 1) return 'BR–200L';
-    if (syl === 2) return '300L–550L';
-    if (syl === 3) return '700L–850L';
-    return '950L+';
-  }
-
-  function detectPhonicsPatterns(rawWord) {
-    const w = rawWord.toLowerCase().replace(/[^a-z]/g, '');
-    if (!w || w.length < 2) return [];
-    const tags = [];
-
-    if (/^(un|re|pre|dis|mis|non|over|under)./.test(w) && w.length >= 6) tags.push('prefix');
-    if (/(tion|sion)$/.test(w)) tags.push('-tion/-sion suffix');
-    else if (/(ies|es)$/.test(w) && w.length > 4) tags.push('-s/-es suffix');
-    else if (/s$/.test(w) && !/ss$/.test(w) && w.length > 3) tags.push('-s/-es suffix');
-    if (/ed$/.test(w) && w.length > 4) tags.push('-ed suffix');
-    if (/ing$/.test(w) && w.length > 5) tags.push('-ing suffix');
-    if (/(er|est)$/.test(w) && w.length > 5) tags.push('-er/-est suffix');
-    if (/ly$/.test(w) && w.length > 4) tags.push('-ly suffix');
-    if (/(ful|less|ness|ment|able|ible|ive|ous)$/.test(w) && w.length > 5) tags.push('derivational suffix');
-
-    if (/(ar|er|ir|or|ur)/.test(w)) tags.push('r-controlled vowel');
-    if (/(ai|ay|ee|ea|oa|ow|oe|ie|ue|ui|oo|ou|oy|oi|au|aw|ew)/.test(w)) tags.push('vowel team / diphthong');
-    if (/[bcdfghjklmnpqrstvwxyz][aeiou][bcdfghjklmnpqrstvwxyz]e$/.test(w) && !/(ee|oo)e$/.test(w)) tags.push('silent-e (VCe)');
-    if (/(ch|sh|th|wh|ph|ck|ng)/.test(w)) tags.push('consonant digraph');
-    if (/^(bl|br|cl|cr|dr|fl|fr|gl|gr|pl|pr|sc|sk|sl|sm|sn|sp|st|sw|tr|tw|scr|spl|spr|str)/.test(w)) tags.push('consonant blend');
-    if (/c[eiy]/.test(w)) tags.push('soft c');
-    if (/g[eiy]/.test(w)) tags.push('soft g');
-    if (/[bcdfghjklmnpqrstvwxyz]le$/.test(w)) tags.push('consonant + le');
-
-    if (!tags.length) {
-      tags.push(estimateSyllables(w) >= 3 ? 'multisyllabic word' : 'single-syllable / regular pattern');
-    }
-    return tags;
-  }
-
-  // ---------- overall session Lexile estimate & DIBELS-style fluency benchmark ----------
-  // Two public reference tables, both Spring / 50th-percentile (median) national norms:
-  //  - ORF_WCPM_SPRING_50TH: Hasbrouck & Tindal oral reading fluency norms — grades 1-6 from the
-  //    2017 update, grades 7-8 carried over from their 2006 update (the 2017 study didn't
-  //    republish those two grades). This is the same kind of words-correct-per-minute norm table
-  //    DIBELS benchmark status is built on.
-  //  - LEXILE_SPRING_50TH: MetaMetrics' published "Lexile Student Measures by Grade" chart.
-  //    K's -140 stands in for "BR140L" (Beginning Reader), MetaMetrics' below-zero scale.
-  // Neither table is reproduced here as anything but public benchmark reference data, and
-  // nothing below is an official DIBELS score or a certified Lexile® measurement — see the
-  // caveat printed alongside the estimate in the UI.
-  const ORF_WCPM_SPRING_50TH = { 1: 60, 2: 100, 3: 112, 4: 133, 5: 146, 6: 146, 7: 150, 8: 151 };
-  const LEXILE_SPRING_50TH = { K: -140, 1: 110, 2: 335, 3: 535, 4: 710, 5: 860, 6: 980, 7: 1075, 8: 1145 };
-
-  function formatLexile(num) {
-    if (num == null) return '—';
-    const rounded = Math.round(num / 5) * 5; // Lexile measures are conventionally reported in 5s
-    return rounded < 0 ? ('BR' + Math.abs(rounded) + 'L') : (rounded + 'L');
-  }
-
-  // Turns this session's WCPM into an approximate overall Lexile-style estimate by finding where
-  // it falls on the Hasbrouck-Tindal WCPM-by-grade curve (interpolating between grades), then
-  // reading off the equivalent point on the Lexile-by-grade curve — i.e. "this reading pace is
-  // about as fluent as a typical grade-X reader in spring, and grade X reads at approximately
-  // Y Lexile." Purely fluency-based, same as DIBELS ORF; doesn't account for comprehension or
-  // vocabulary the way a real Lexile assessment does.
-  // Grades 5 and 6 share the same WCPM norm (146 — a genuine plateau in the published data, not
-  // a typo), which would otherwise make interpolation jump straight from grade 5 to grade 7 for
-  // any WCPM just above 146, skipping grade 6's Lexile value entirely and creating a visible
-  // discontinuity for a 1-WCPM difference. Collapsing tied WCPM points down to one — keeping the
-  // higher grade's Lexile value — keeps the curve smooth and monotonic.
-  const FLUENCY_LEXILE_POINTS = (function () {
-    const points = [];
-    [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (g) {
-      const w = ORF_WCPM_SPRING_50TH[g], l = LEXILE_SPRING_50TH[g];
-      const last = points[points.length - 1];
-      if (last && last.w === w) last.l = Math.max(last.l, l);
-      else points.push({ w: w, l: l });
-    });
-    return points;
-  })();
-
-  function estimateOverallLexile(wcpm) {
-    if (wcpm == null) return null;
-    const pts = FLUENCY_LEXILE_POINTS;
-    if (wcpm <= 0) return LEXILE_SPRING_50TH.K;
-    if (wcpm <= pts[0].w) {
-      const t = wcpm / pts[0].w;
-      return LEXILE_SPRING_50TH.K + t * (pts[0].l - LEXILE_SPRING_50TH.K);
-    }
-    if (wcpm >= pts[pts.length - 1].w) return pts[pts.length - 1].l;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1];
-      if (wcpm >= a.w && wcpm <= b.w) {
-        const t = b.w > a.w ? (wcpm - a.w) / (b.w - a.w) : 0;
-        return a.l + t * (b.l - a.l);
-      }
-    }
-    return pts[pts.length - 1].l;
-  }
-
-  // DIBELS-style benchmark status: this session's WCPM against the selected grade's Spring
-  // 50th-percentile norm. The 100%/85% cut points are a simplified stand-in for DIBELS' own
-  // percentile-based tiers (which need the full percentile distribution, not just the median,
-  // to reproduce exactly) — close enough to flag "on track" vs. "needs support," not a
-  // replacement for an actual DIBELS administration.
-  function benchmarkStatus(wcpm, grade) {
-    const target = ORF_WCPM_SPRING_50TH[grade];
-    if (wcpm == null || target == null) return null;
-    const pct = wcpm / target;
-    let tier;
-    if (pct >= 1) tier = 'At/Above Benchmark';
-    else if (pct >= 0.85) tier = 'Below Benchmark';
-    else tier = 'Well Below Benchmark';
-    return { target, pct, tier };
-  }
-
-  function computeMissedAnalysis() {
-    const missed = words.filter(w => w.status === 'incorrect' || w.status === 'skipped');
-    const patternCounts = {};
-    const lexileCounts = {};
-    const detail = missed.map(w => {
-      const patterns = detectPhonicsPatterns(w.raw);
-      const lexile = estimateLexileBand(w.raw);
-      patterns.forEach(p => { patternCounts[p] = (patternCounts[p] || 0) + 1; });
-      lexileCounts[lexile] = (lexileCounts[lexile] || 0) + 1;
-      return { word: w.raw, status: w.status, patterns, lexile };
-    });
-    return { missed, patternCounts, lexileCounts, detail };
-  }
-
-  // ---------- 2nd-pass validation: capture/timing-mismatch reconciliation ----------
-  // A word marked incorrect only ever got there because what the recognizer *heard* for it
-  // didn't match. But speech recognition attributes audio to words by timing, not meaning — a
-  // late-arriving or early-arriving chunk can get logged against the wrong word's slot even
-  // though the reader actually said the right thing. The tell: what was captured for word i
-  // doesn't match word i, but it DOES cleanly match the word right before or right after it.
-  // That's much more likely a capture-delay/segmentation mismatch than a real misread, so it
-  // gets reclassified as "corrected" — not counted against the score — with a note on exactly
-  // why, so a reviewer can still see it happened and second-guess the call if they want to.
-  // How far the 2nd pass looks for a neighboring word that the captured speech might actually
-  // belong to. Defaults to 6 words in either direction; when the "cover unread text" reveal is
-  // set to show several words ahead, widen the window to 2x that (so it stays at least as wide
-  // as what the reader can already see coming) whenever that's bigger than the default.
-  function secondPassLookback() {
-    const revealWords = parseInt(revealWordsSelect.value, 10) || 0;
-    return Math.max(6, revealWords * 2);
-  }
-
-  // Searches outward from the flagged word (closest neighbors first, previous word winning ties
-  // over the next word at the same distance) for a target word the captured speech actually matches.
-  function findNearbySecondPassMatch(i, heardNorm, lookback) {
-    for (let dist = 1; dist <= lookback; dist++) {
-      const prevIdx = i - dist;
-      const nextIdx = i + dist;
-      if (prevIdx >= 0 && isMatch(heardNorm, words[prevIdx].norm)) {
-        return { word: words[prevIdx], offset: -dist };
-      }
-      if (nextIdx < words.length && isMatch(heardNorm, words[nextIdx].norm)) {
-        return { word: words[nextIdx], offset: dist };
-      }
-    }
-    return null;
-  }
-
-  function runSecondPassValidation() {
-    const lookback = secondPassLookback();
-
-    words.forEach((w, i) => {
-      if (w.status !== 'incorrect' || !w.heard || !w.heard.length) return;
-
-      for (let j = 0; j < w.heard.length; j++) {
-        const heardRaw = w.heard[j];
-        const heardNorm = normalize(heardRaw);
-        if (!heardNorm) continue;
-
-        const match = findNearbySecondPassMatch(i, heardNorm, lookback);
-        if (match) {
-          const dist = Math.abs(match.offset);
-          const where = dist === 1
-            ? (match.offset < 0 ? 'the previous word' : 'the next word')
-            : (match.offset < 0 ? (dist + ' words earlier') : (dist + ' words later'));
-          w.status = 'corrected';
-          w.correctionNote = '2nd-pass: what was captured here ("' + heardRaw + '") actually matches ' + where +
-            ' ("' + match.word.raw + '"), not this one — most likely a capture-timing/segmentation ' +
-            'mismatch rather than a misread of "' + w.raw + '", so it was not counted as an error.';
-          return;
-        }
-      }
-    });
-  }
-
-  // ---------- repeated-word accuracy ----------
-  // Groups every occurrence of the same word (by normalized spelling) across the whole passage
-  // and tallies how often it was read correctly vs. incorrectly — surfaces a word the reader
-  // consistently trips on, as distinct from a one-off slip on an otherwise-easy word.
-  function computeRepeatedWordAnalysis() {
-    const groups = {};
-    words.forEach(w => {
-      if (!w.norm) return;
-      if (!groups[w.norm]) {
-        groups[w.norm] = { word: w.raw, total: 0, correct: 0, corrected: 0, helped: 0, incorrect: 0, skipped: 0 };
-      }
-      const g = groups[w.norm];
-      g.total += 1;
-      if (w.status === 'correct') g.correct += 1;
-      else if (w.status === 'corrected') g.corrected += 1;
-      else if (w.status === 'helped') g.helped += 1;
-      else if (w.status === 'incorrect') g.incorrect += 1;
-      else if (w.status === 'skipped') g.skipped += 1;
-    });
-    return Object.values(groups)
-      .filter(g => g.total > 1 && g.incorrect > 0)
-      .sort((a, b) => (b.incorrect - a.incorrect) || ((b.incorrect / b.total) - (a.incorrect / a.total)));
-  }
-
-  // ---------- helper-mode follow-up ----------
-  // For every word that needed the native text-to-speech "helper" prompt this session, check
-  // whether the same word (by normalized spelling) comes up again later in the passage, and how
-  // the reader did with it that time. A later independent "correct" (or "corrected") is the
-  // clearest sign the prompt actually taught the word rather than just getting past it once.
-  function computeHelperFollowUp() {
-    const helped = [];
-    words.forEach((w, i) => {
-      if (w.status !== 'helped') return;
-      const laterOccurrences = words.slice(i + 1).filter(w2 => w2.norm === w.norm);
-      let outcome, laterWord = null;
-      if (!laterOccurrences.length) {
-        outcome = 'no-repeat';
-      } else {
-        const firstResolved = laterOccurrences.find(w2 => w2.status !== 'pending');
-        if (!firstResolved) {
-          outcome = 'not-yet-reached';
-        } else {
-          laterWord = firstResolved.raw;
-          if (firstResolved.status === 'correct' || firstResolved.status === 'corrected') outcome = 'applied';
-          else if (firstResolved.status === 'helped') outcome = 'needed-help-again';
-          else outcome = 'missed-again';
-        }
-      }
-      helped.push({ word: w.raw, outcome, laterWord });
-    });
-    return helped;
-  }
-
-  // ---------- build / render reading area ----------
-  function loadText() {
-    // Paragraphs are separated by a blank line (one or more empty lines). Within a paragraph,
-    // any remaining single line breaks are treated as ordinary wrapped text (joined with a
-    // space) so the words still flow and align normally.
-    const raw = sourceText.value;
-    loadedRawText = raw;
-    loggedThisAttempt = false;
-    const paragraphs = raw.split(/\n\s*\n+/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
-
-    words = [];
-    paragraphs.forEach((paraText, pIdx) => {
-      paraText.split(' ').filter(Boolean).forEach(w => {
-        words.push({
-          raw: w,
-          norm: normalize(w),
-          status: 'pending',
-          attempts: 0,
-          missGraceUsed: false,
-          heard: [],
-          correctionNote: null,
-          firstSeenAt: null,
-          resolvedAt: null,
-          durationMs: null,
-          helperTriggered: false,
-          helperUsedAt: null,
-          choralPrompted: false,
-          choralUsedAt: null,
-          noBreakAfter: false,
-          preferChunkStart: false,
-          para: pIdx
-        });
-      });
-    });
-
-    pointer = 0;
-    lastWcpm = null;
-    lastElapsedMs = null;
-    lastOverallLexile = null;
-    lastBenchmark = null;
-    lastGradeLevel = null;
-    clearHelperTimer();
-    resetChoralState();
-    scoreBanner.style.display = 'none';
-    timingPanel.classList.remove('show');
-    timingPanel.innerHTML = '';
-    analysisPanel.classList.remove('show');
-    analysisPanel.innerHTML = '';
-    renderWords();
-    setStatus('Text loaded — press "Start reading" and read it aloud.');
-  }
-
-  function renderWords() {
-    readingArea.innerHTML = '';
-    let currentParaEl = null;
-    let currentParaIdx = null;
-    const spans = [];
-    words.forEach((w, i) => {
-      if (w.para !== currentParaIdx) {
-        currentParaEl = document.createElement('p');
-        currentParaEl.className = 'para-block';
-        readingArea.appendChild(currentParaEl);
-        currentParaIdx = w.para;
-      }
-      const span = document.createElement('span');
-      span.className = 'word ' + w.status;
-      if (i === pointer && isListening) span.classList.add('current-target');
-      if (w.status === 'pending' && w.attempts > 0) span.classList.add('attempting');
-      if (i === pointer && isListening && w.status === 'pending') {
-        // Let the reader (or whoever's helping them) ask for the word to be read aloud right
-        // now, instead of only ever getting it after the helper-mode wait — this works whether
-        // or not the automatic helper-mode timer is even turned on.
-        span.classList.add('help-clickable');
-        span.title = 'Click for help with this word';
-        span.addEventListener('click', function () { requestHelpForWord(i); });
-      }
-      span.appendChild(document.createTextNode(w.raw));
-      if (w.attempts > 0) {
-        const badge = document.createElement('sup');
-        badge.className = 'attempt-badge';
-        badge.textContent = '×' + w.attempts;
-        span.appendChild(badge);
-      }
-      currentParaEl.appendChild(span);
-      spans.push(span);
-    });
-    applyCoverMask(spans);
-  }
-
-  // "Cover unread text" mode: by default, everything after the current word — the rest of this
-  // line, and every line below it — is replaced with a solid block. The two reveal dropdowns let
-  // a small number of upcoming words on the current line, and a small number of lines below it,
-  // stay visible anyway — turning the cover into adjustable scaffolding that can be faded back
-  // toward full support removed (0/0) as the reader needs it less.
-  //
-  // The spans are already appended to the DOM at this point, so each one's real, laid-out
-  // position (offsetTop) tells us which visual line it landed on — grouping words by matching
-  // offsetTop gives true line boundaries for free, without reimplementing text wrapping.
-  function applyCoverMask(spans) {
-    spans.forEach(s => s.classList.remove('masked'));
-    if (!coverToggle.checked || !spans.length || pointer >= spans.length) return;
-
-    const revealWords = parseInt(revealWordsSelect.value, 10) || 0;
-    const revealLines = parseInt(revealLinesSelect.value, 10) || 0;
-
-    const currentTop = spans[pointer].offsetTop;
-
-    // How many words are left on the current line after the pointer, and where does the next
-    // line start?
-    let sameLineCount = 0;
-    let i = pointer + 1;
-    while (i < spans.length && spans[i].offsetTop <= currentTop + 2) {
-      sameLineCount++;
-      i++;
-    }
-
-    const revealOnThisLine = Math.min(revealWords, sameLineCount);
-    for (let k = pointer + 1; k < pointer + 1 + sameLineCount; k++) {
-      if (k - (pointer + 1) >= revealOnThisLine) spans[k].classList.add('masked');
-    }
-
-    // If the line runs out before the "words ahead" budget does — including reaching the end of
-    // the line with the whole budget unused — whatever's left over previews into the start of
-    // the next line instead of just disappearing at the line break.
-    const spillover = Math.max(0, revealWords - sameLineCount);
-
-    let lineOffset = 1; // the line `i` is now on, relative to the current word's line
-    let lastTop = i < spans.length ? spans[i].offsetTop : null;
-    let wordsIntoThisLine = 0;
-
-    for (; i < spans.length; i++) {
-      const top = spans[i].offsetTop;
-      if (top > lastTop + 2) {
-        lineOffset += 1;
-        lastTop = top;
-        wordsIntoThisLine = 0;
-      }
-      wordsIntoThisLine += 1;
-      const revealedBySpillover = lineOffset === 1 && wordsIntoThisLine <= spillover;
-      const revealedByLineCount = lineOffset <= revealLines;
-      if (!revealedBySpillover && !revealedByLineCount) spans[i].classList.add('masked');
-    }
-  }
-
-  function applyMaskColor(color) {
-    document.documentElement.style.setProperty('--mask-color', color);
-    maskColorPicker.value = color;
-  }
 
   // ---------- typography ----------
   function applyTypography() {
@@ -2052,83 +1547,19 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     applyTypography();
   }
 
-  function setStatus(msg, kind) {
-    statusLine.textContent = msg;
-    statusLine.className = 'status-line' + (kind ? ' ' + kind : '');
-  }
 
-  // ---------- timing ----------
-  function ensureStamped(index, ts) {
-    if (words[index] && words[index].firstSeenAt == null) words[index].firstSeenAt = ts;
-  }
-
-  function markResolved(index, status, ts) {
-    // A word that got a helper-mode prompt still counts as "said correctly" once the reader
-    // repeats it, but it's tracked as a distinct outcome (not a fully independent read) so
-    // scoring, the analysis panel, and the highlight color can all tell the two apart.
-    if (status === 'correct' && words[index].helperTriggered) {
-      status = 'helped';
-      words[index].correctionNote = 'Helper mode: the device read this word aloud, and it was marked correct after the reader repeated it.';
-    } else if (status === 'correct' && words[index].choralPrompted) {
-      status = 'echoed';
-      words[index].correctionNote = 'Choral mode: the device read this phrase aloud first, and this word was marked correct after the reader repeated it.';
-    }
-    words[index].status = status;
-    words[index].resolvedAt = ts;
-    words[index].durationMs = (words[index].firstSeenAt != null) ? (ts - words[index].firstSeenAt) : null;
-  }
-
-  function advancePointerTo(newIndex, ts) {
-    pointer = newIndex;
-    ensureStamped(pointer, ts);
-    scheduleHelperTimer();
-    maybeNarrateChoralChunk();
-  }
-
-  // ---------- helper mode ----------
+  // ---------- voice & text-to-speech ----------
+  // (Shared by both Read mode's own calls and Exam mode's — see speakTts/getSelectedVoice/
+  // populateVoiceList, all used from exam-prefixed code too.)
   // When on, if the reader hasn't gotten the current word after N seconds, the device speaks it
   // aloud (native text-to-speech) as a prompt. If the reader then repeats it correctly, it's
   // marked "helped" rather than plain "correct" — see markResolved.
-  function clearHelperTimer() {
-    if (helperTimerHandle) { clearTimeout(helperTimerHandle); helperTimerHandle = null; }
-  }
 
-  function scheduleHelperTimer() {
-    clearHelperTimer();
-    if (!helperModeToggle.checked || !isListening) return;
-    if (pointer >= words.length || words[pointer].status !== 'pending') return;
 
-    const wordIndexAtSchedule = pointer;
-    const delaySec = parseInt(helperDelaySelect.value, 10) || 5;
-    helperTimerHandle = setTimeout(function () {
-      helperTimerHandle = null;
-      // Guard against the pointer having moved on (word already resolved) by the time this fires.
-      if (pointer !== wordIndexAtSchedule) return;
-      const word = words[pointer];
-      if (!word || word.status !== 'pending') return;
-      if (!helperModeToggle.checked || !isListening) return;
-      triggerHelperPrompt(word);
-    }, delaySec * 1000);
-  }
-
-  function triggerHelperPrompt(word) {
-    word.helperTriggered = true;
-    word.helperUsedAt = Date.now();
-    speakWordAloud(word.raw);
-    renderWords();
-    setStatus('The device just said "' + word.raw + '" aloud — repeat it to mark it correct with help.', 'warn');
-  }
 
   // Manual "I need help" click on the word currently being read — jumps straight to the same
   // prompt the auto-timer gives, without waiting, and works even if helper mode's auto-timer
   // toggle is off. Only the active (current-target) word is clickable; see renderWords.
-  function requestHelpForWord(i) {
-    if (i !== pointer || pointer >= words.length) return;
-    const word = words[pointer];
-    if (!word || word.status !== 'pending') return;
-    clearHelperTimer();
-    triggerHelperPrompt(word);
-  }
 
   // Shared by helper-mode prompts and choral-mode phrase narration. Voice comes from the Voice
   // picker below (see populateVoiceList/getSelectedVoice) — "Device default" (an empty value)
@@ -2279,586 +1710,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     } catch (e) { /* speech synthesis unavailable or blocked — fail silently, highlight still helps */ }
   }
 
-  function speakWordAloud(text) {
-    speakTts(text, null);
-  }
-
-  // ---------- choral mode ----------
-  // When on, the device takes the lead: it reads the passage a short phrase at a time at a pace
-  // set by the WCPM field, then pauses for the reader to repeat the phrase back. It reuses the
-  // exact same word-by-word matching engine as independent reading — the only difference is that
-  // phrases get spoken aloud ahead of the reader instead of the reader leading on their own.
-  // Unlike helper mode, every prompted word is intentional (not a response to getting stuck), so
-  // it's tracked with its own "echoed" status rather than "helped".
-  //
-  // Phrase boundaries default to a plain 2-3 word / punctuation rule, but when the "compromise"
-  // NLP library (loaded via <script> tag, see the bottom of <body>) is available, computeChoralHints
-  // runs it once per passage and tags each word with two soft hints:
-  //   - noBreakAfter: this word is inside a multi-word noun or verb phrase ("the lazy dog",
-  //     "is running") — don't end a phrase between it and the next word.
-  //   - preferChunkStart: this word is a conjunction ("and", "but") or preposition ("in", "of")
-  //     — prefer starting a fresh phrase here rather than trailing it onto the previous one.
-  // If the library never loaded (offline, blocked, etc.), every word's hints stay false and the
-  // chunker quietly behaves exactly like the plain length/punctuation rule it always had.
-  function findWordSpan(phraseWords, searchFrom) {
-    for (let i = searchFrom; i <= words.length - phraseWords.length; i++) {
-      let ok = true;
-      for (let k = 0; k < phraseWords.length; k++) {
-        if (normalize(words[i + k].raw) !== phraseWords[k]) { ok = false; break; }
-      }
-      if (ok) return i;
-    }
-    return -1;
-  }
-
-  function computeChoralHints() {
-    words.forEach(w => { w.noBreakAfter = false; w.preferChunkStart = false; });
-    if (typeof nlp === 'undefined') return; // NLP library not loaded — plain rule applies to every word
-    try {
-      const doc = nlp(loadedRawText);
-
-      // Noun phrases ("the lazy dog") and verb phrases ("is running") — glue every word inside
-      // a multi-word match to the one after it, so a chunk break never lands in the middle.
-      [doc.nouns(), doc.verbs()].forEach(matchSet => {
-        let cursor = 0;
-        matchSet.json().forEach(m => {
-          const phraseWords = (m.text || '').split(/\s+/).map(normalize).filter(Boolean);
-          if (phraseWords.length < 2) return;
-          const at = findWordSpan(phraseWords, cursor);
-          if (at === -1) return;
-          for (let k = at; k < at + phraseWords.length - 1; k++) words[k].noBreakAfter = true;
-          cursor = at + phraseWords.length;
-        });
-      });
-
-      // Conjunctions and prepositions — every occurrence in the passage is a reasonable place to
-      // start a new phrase, so these are matched by word identity rather than position.
-      [doc.conjunctions(), doc.prepositions()].forEach(matchSet => {
-        matchSet.json().forEach(m => {
-          const norm = normalize(m.text || '');
-          if (!norm) return;
-          words.forEach(w => { if (normalize(w.raw) === norm) w.preferChunkStart = true; });
-        });
-      });
-    } catch (e) { /* NLP hinting unavailable this session — chunker falls back to the plain rule */ }
-  }
-
-  function buildChoralChunks() {
-    const chunks = [];
-    const n = words.length;
-    const MAX_CHUNK = 4; // a hard ceiling even when a glued phrase would otherwise run longer
-    let i = 0;
-    while (i < n) {
-      let end = i + 1;
-      while (end < n && (end - i) < MAX_CHUNK) {
-        const last = words[end - 1];
-        if (/[.,;:!?]$/.test(last.raw)) break;             // punctuation always ends the phrase
-        if (last.noBreakAfter) { end++; continue; }         // mid noun/verb phrase — keep going
-        const next = words[end];
-        if ((end - i) >= 2 && next.preferChunkStart) break; // let a conjunction/preposition start fresh
-        if ((end - i) >= 3) break;                          // default target: 2-3 words
-        end++;
-      }
-      chunks.push({ start: i, end: end });
-      i = end;
-    }
-    return chunks;
-  }
-
-  function findChoralChunk(wordIndex) {
-    return choralChunks.find(c => wordIndex >= c.start && wordIndex < c.end) || null;
-  }
-
-  function resetChoralState() {
-    computeChoralHints();
-    choralChunks = buildChoralChunks();
-    choralNarratedChunkEnd = -1;
-  }
-
-  // No standard maps an utterance's abstract "rate" multiplier to words-per-minute, but ~150
-  // wpm is a commonly used baseline for rate=1 ("normal") across speech engines — scale relative
-  // to that, clamped to a range that stays intelligible.
-  function choralRateFromWcpm(wcpm) {
-    const baselineWpm = 150;
-    return Math.max(0.5, Math.min(2, wcpm / baselineWpm));
-  }
-
-  function maybeNarrateChoralChunk() {
-    if (!choralModeToggle.checked || !isListening) return;
-    if (pointer >= words.length) return;
-    if (pointer < choralNarratedChunkEnd) return; // this chunk has already been read aloud
-    const chunk = findChoralChunk(pointer);
-    if (!chunk) return;
-    choralNarratedChunkEnd = chunk.end;
-    for (let i = chunk.start; i < chunk.end; i++) {
-      words[i].choralPrompted = true;
-      if (words[i].choralUsedAt == null) words[i].choralUsedAt = Date.now();
-    }
-    const phrase = words.slice(chunk.start, chunk.end).map(w => w.raw).join(' ');
-    const wcpmTarget = parseInt(choralWcpmInput.value, 10) || 100;
-    speakTts(phrase, choralRateFromWcpm(wcpmTarget));
-    setStatus('The device just read "' + phrase + '" aloud — repeat it back to continue.', 'warn');
-  }
-
-  // ---------- alignment ----------
-  // A word only counts as "done" (and the pointer moves on) when a finalized speech-recognition
-  // result fuzzy-matches the whole word, or clearly matches a word further ahead (meaning the
-  // reader moved on). Shorter fragments that look like the start of, or a syllable within, the
-  // current word are treated as sounding-out attempts: they're logged, but they don't mark the
-  // word wrong and — critically — they don't move the pointer, so later words are still compared
-  // against the right target instead of cascading into false "incorrect" marks.
-  // `ts` is the timestamp attributed to this token. When several words arrive in a single final
-  // speech-recognition result (typical when reading quickly — the recognizer batches them
-  // together instead of finalizing word-by-word), the caller spreads a synthetic timestamp
-  // across the batch instead of stamping every word in it with the exact same Date.now(), which
-  // is what made per-word timing collapse toward 0 for fast reading.
-  function processSpokenWord(rawWord, ts) {
-    const norm = normalize(rawWord);
-    if (!norm || pointer >= words.length) return;
-
-    const now = ts != null ? ts : Date.now();
-    ensureStamped(pointer, now);
-    const current = words[pointer];
-
-    // 1) Direct match on the current word
-    if (isMatch(current.norm, norm)) {
-      markResolved(pointer, 'correct', now);
-      advancePointerTo(pointer + 1, now);
-      renderWords();
-      if (pointer >= words.length) finishSession(true);
-      return;
-    }
-
-    // 2) Does it match a word further ahead? (reader jumped past the current word)
-    const WINDOW = 6;
-    let found = -1;
-    for (let i = pointer + 1; i < Math.min(words.length, pointer + WINDOW); i++) {
-      if (words[i].status === 'pending' && isMatch(words[i].norm, norm)) {
-        found = i;
-        break;
-      }
-    }
-    if (found !== -1) {
-      // Words jumped over get marked based on whether there was ever a real attempt at them:
-      // a word the reader actually tried (sounded out, or one miss) and then abandoned reads as
-      // incorrect; a word the reader's voice never touched reads as skipped.
-      for (let i = pointer; i < found; i++) {
-        const attempted = words[i].attempts > 0 || words[i].missGraceUsed;
-        markResolved(i, attempted ? 'incorrect' : 'skipped', now);
-      }
-      markResolved(found, 'correct', now);
-      advancePointerTo(found + 1, now);
-      renderWords();
-      if (pointer >= words.length) finishSession(true);
-      return;
-    }
-
-    // 3) Does it look like the reader is sounding out the current word? Don't penalize, don't advance.
-    if (isPartialAttempt(current.norm, norm)) {
-      current.attempts += 1;
-      current.heard.push(rawWord);
-      renderWords();
-      return;
-    }
-
-    // 4) Doesn't match the current word, a nearby word, or look like a sound-out fragment.
-    // Give it one free pass first (a single odd transcription shouldn't immediately read as an
-    // error) — only a *second* unmatched attempt on the same word counts it wrong.
-    if (!current.missGraceUsed) {
-      current.missGraceUsed = true;
-      current.attempts += 1;
-      current.heard.push(rawWord);
-      renderWords();
-      return;
-    }
-
-    current.heard.push(rawWord);
-    markResolved(pointer, 'incorrect', now);
-    advancePointerTo(pointer + 1, now);
-    // one retry: maybe this word actually matches the *next* expected word (an inserted word)
-    if (pointer < words.length && isMatch(words[pointer].norm, norm)) {
-      markResolved(pointer, 'correct', now);
-      advancePointerTo(pointer + 1, now);
-    }
-    renderWords();
-
-    if (pointer >= words.length) {
-      finishSession(true);
-    }
-  }
-
-  // ---------- speech recognition ----------
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  if (!SR) {
-    unsupported.style.display = 'block';
-    micBtn.disabled = true;
-  } else {
-    recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onstart = function () {
-      isListening = true;
-      micDot.classList.add('live');
-      micLabel.textContent = 'Stop reading';
-      setStatus('Listening… read the highlighted text aloud.');
-      const startTs = Date.now();
-      ensureStamped(pointer, startTs);
-      lastFinalEventTime = startTs;
-      interimCommitted = [];
-      startLiveTimer();
-      scheduleHelperTimer();
-      maybeNarrateChoralChunk();
-      renderWords();
-    };
-
-    recognition.onresult = function (event) {
-      // While the device itself is talking (a helper-mode or choral-mode prompt), plus a short
-      // grace period after, ignore whatever the mic picks up — otherwise the recognizer can hear
-      // the device's own voice through the speakers/headset and mistake it for the reader.
-      // Transcript bookkeeping (interimCommitted) still advances below so nothing gets replayed
-      // once the mute lifts; muted words are just never acted on.
-      const muted = ttsSpeaking || Date.now() < muteRecognitionUntil;
-      let interim = '';
-      let finalWords = [];
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0].transcript.trim();
-        const allWords = transcript ? transcript.split(/\s+/).filter(Boolean) : [];
-        const already = interimCommitted[i] || 0;
-        const newWords = allWords.slice(already);
-
-        if (result.isFinal) {
-          // Commit whatever hasn't already been claimed by the fast interim path below, through
-          // the normal batched/interpolated route.
-          finalWords = finalWords.concat(newWords);
-          interimCommitted[i] = allWords.length;
-        } else {
-          interim += transcript;
-          // Fast path: the recognizer often reveals a completed word in an interim result well
-          // before it decides to finalize the whole phrase (finalization waits for a pause).
-          // If exactly one new word has shown up and it's clearly the word we're expecting right
-          // now, act on it immediately instead of waiting — that's what makes a correctly-read
-          // word advance right away instead of lagging behind your voice. Anything ambiguous
-          // (more than one new word at once, or a word that doesn't match) is left for the final
-          // result, so the sounding-out/grace handling below still gets first crack at it.
-          if (!muted && newWords.length === 1 && pointer < words.length && isMatch(words[pointer].norm, normalize(newWords[0]))) {
-            const ts = Date.now();
-            processSpokenWord(newWords[0], ts);
-            lastFinalEventTime = ts;
-            interimCommitted[i] = already + 1;
-          }
-        }
-      }
-      if (finalWords.length) {
-        // The Web Speech API only gives us a timestamp for the whole finalized chunk, not one
-        // per word — and when you read quickly, several words often land in the same chunk. Spread
-        // a synthetic timestamp evenly across the chunk's real elapsed time (since the previous
-        // chunk) instead of stamping every word in it with the same instant, so fast reads still
-        // get a sensible time-per-word breakdown instead of everything collapsing to ~0s.
-        const chunkEnd = Date.now();
-        if (!muted) {
-          const chunkStart = lastFinalEventTime != null ? lastFinalEventTime : chunkEnd;
-          const n = finalWords.length;
-          const span = Math.max(0, chunkEnd - chunkStart);
-          finalWords.forEach((w, idx) => {
-            const ts = n > 1 ? Math.round(chunkStart + ((idx + 1) / n) * span) : chunkEnd;
-            processSpokenWord(w, ts);
-          });
-        }
-        // Keep the timing baseline current even when muted, so the pause spent listening to the
-        // device's own prompt doesn't get counted as time-on-word once we resume.
-        lastFinalEventTime = chunkEnd;
-      }
-      captionEl.textContent = (!muted && interim) ? ('“' + interim.trim() + '”') : '';
-    };
-
-    recognition.onerror = function (event) {
-      if (event.error === 'no-speech' || event.error === 'audio-capture') {
-        // benign — keep going, onend will restart if still listening
-        return;
-      }
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        setStatus('Microphone access was blocked. Allow microphone permission for this page and try again.', 'error');
-        userStopped = true;
-      } else {
-        setStatus('Speech recognition error: ' + event.error, 'error');
-      }
-    };
-
-    recognition.onend = function () {
-      captionEl.textContent = '';
-      if (!userStopped) {
-        // Chrome stops recognition after pauses; auto-restart to keep the session continuous
-        try { recognition.start(); } catch (e) { /* already starting */ }
-      } else {
-        isListening = false;
-        micDot.classList.remove('live');
-        micLabel.textContent = 'Start reading';
-        setStatus('Stopped. Press "Start reading" to continue, or "Reset highlights" to try again.');
-        stopLiveTimer();
-        clearHelperTimer();
-        renderWords();
-      }
-    };
-  }
-
-  // ---------- live per-word stopwatch ----------
-  function startLiveTimer() {
-    liveTimer.classList.add('show');
-    stopLiveTimer(); // clear any previous interval
-    liveTimerHandle = setInterval(function () {
-      if (pointer >= words.length || words[pointer].firstSeenAt == null) {
-        liveTimerValue.textContent = '0.0s';
-        return;
-      }
-      const secs = (Date.now() - words[pointer].firstSeenAt) / 1000;
-      liveTimerValue.textContent = secs.toFixed(1) + 's';
-    }, 150);
-  }
-
-  function stopLiveTimer() {
-    if (liveTimerHandle) { clearInterval(liveTimerHandle); liveTimerHandle = null; }
-    liveTimer.classList.remove('show');
-  }
-
-  function startListening() {
-    if (!recognition || words.length === 0) {
-      if (words.length === 0) setStatus('Load some text first.', 'warn');
-      return;
-    }
-    userStopped = false;
-    try { recognition.start(); } catch (e) { /* already started */ }
-  }
-
-  function stopListening() {
-    userStopped = true;
-    if (recognition) recognition.stop();
-    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
-  }
-
-  function finishSession(auto) {
-    const now = Date.now();
-    words.forEach(w => {
-      if (w.status === 'pending') {
-        const attempted = w.attempts > 0 || w.missGraceUsed;
-        markResolved(words.indexOf(w), attempted ? 'incorrect' : 'skipped', now);
-        // only report a duration if they were actually engaging with the word
-        if (!attempted) w.durationMs = null;
-      }
-    });
-
-    runSecondPassValidation();
-    renderWords();
-    stopListening();
-    stopLiveTimer();
-    clearHelperTimer();
-
-    const total = words.length;
-    const correct = words.filter(w => w.status === 'correct').length;
-    const corrected = words.filter(w => w.status === 'corrected').length;
-    const helped = words.filter(w => w.status === 'helped').length;
-    const echoed = words.filter(w => w.status === 'echoed').length;
-    const skipped = words.filter(w => w.status === 'skipped').length;
-    const incorrect = words.filter(w => w.status === 'incorrect').length;
-    // Helped and echoed words are still counted as "correct" for the overall score, per how
-    // helper mode and choral mode are meant to work — they just carry a distinct highlight/status
-    // so it's clear that support was given.
-    const pct = total ? Math.round(((correct + corrected + helped + echoed) / total) * 100) : 0;
-
-    // Words correct per minute (WCPM): a standard oral-reading-fluency measure.
-    // Elapsed time spans from when the reader first engaged with a word to when the
-    // last word was resolved, so pauses spent sounding a word out still count against pace.
-    // Helped and echoed words are deliberately left out of the WCPM numerator — WCPM is meant to
-    // reflect independent reading pace, and a prompted word (whether from a helper-mode timeout or
-    // a choral-mode lead-in) wasn't read independently, even though it still counts toward the
-    // overall accuracy score above.
-    const timedWords = words.filter(w => w.firstSeenAt != null);
-    const sessionStartMs = timedWords.length ? Math.min(...timedWords.map(w => w.firstSeenAt)) : null;
-    const resolvedTimes = words.filter(w => w.resolvedAt != null).map(w => w.resolvedAt);
-    const sessionEndMs = resolvedTimes.length ? Math.max(...resolvedTimes) : now;
-    const elapsedMs = sessionStartMs != null ? Math.max(sessionEndMs - sessionStartMs, 0) : 0;
-    const elapsedMinutes = elapsedMs / 60000;
-    const wcpm = elapsedMinutes > 0 ? Math.round((correct + corrected) / elapsedMinutes) : null;
-    lastWcpm = wcpm;
-    lastElapsedMs = elapsedMs;
-
-    // Overall Lexile-style estimate and DIBELS-style benchmark status, both purely from this
-    // session's WCPM — see estimateOverallLexile/benchmarkStatus for the methodology and caveats.
-    const gradeLevel = gradeLevelSelect.value || null;
-    const overallLexile = estimateOverallLexile(wcpm);
-    const benchmark = (gradeLevel && gradeLevel !== 'K') ? benchmarkStatus(wcpm, gradeLevel) : null;
-    lastOverallLexile = overallLexile;
-    lastBenchmark = benchmark;
-    lastGradeLevel = gradeLevel;
-
-    scoreBanner.style.display = 'block';
-    scoreBanner.innerHTML = (auto ? '🎉 Nice reading! ' : 'Session ended. ') +
-      '<b>' + pct + '%</b> read correctly — ' +
-      correct + ' correct, ' + skipped + ' skipped, ' + incorrect + ' incorrect' +
-      (corrected ? ', ' + corrected + ' auto-corrected after a capture-timing check (not counted against you)' : '') +
-      (helped ? ', ' + helped + ' correct with helper-mode assistance' : '') +
-      (echoed ? ', ' + echoed + ' correct after a choral prompt' : '') +
-      ' (of ' + total + ' words).' +
-      (wcpm != null ? ' <b>' + wcpm + '</b> words correct per minute (WCPM).' : '');
-    setStatus('Session finished. Press "Reset highlights" to try again.');
-
-    renderTimingPanel();
-    renderAnalysisPanel();
-
-    if (!loggedThisAttempt) {
-      loggedThisAttempt = true;
-      logSession({ total, correct, corrected, helped, echoed, skipped, incorrect, pct, wcpm, elapsedMs, gradeLevel, overallLexile, benchmark });
-    }
-  }
-
-  function renderAnalysisPanel() {
-    const { missed, patternCounts, lexileCounts, detail } = computeMissedAnalysis();
-    const helperFollowUp = computeHelperFollowUp();
-
-    let html = '';
-    html += renderOverallLexileSection();
-
-    if (!missed.length) {
-      html += '<h3>Missed-word analysis</h3>' +
-        '<div class="insight-line">🎉 No missed words to analyze — every word was read correctly' +
-        (helperFollowUp.length ? ', or correctly with a helper-mode prompt' : '') + '.</div>';
-    } else {
-      const topPatterns = Object.entries(patternCounts).sort((a, b) => b[1] - a[1]);
-      const lexileEntries = Object.entries(lexileCounts).sort((a, b) => b[1] - a[1]);
-
-      html += '<h3>Missed-word analysis</h3>';
-      html += '<div class="insight-line">📊 ' + missed.length + ' word' + (missed.length > 1 ? 's' : '') +
-        ' missed (incorrect or skipped) out of ' + words.length + '.</div>';
-
-      if (topPatterns.length) {
-        html += '<div class="insight-line">🔤 Most common phonics pattern' + (topPatterns.length > 1 ? 's' : '') + ' among missed words: ' +
-          topPatterns.slice(0, 5).map(([p, c]) => '<b>' + escapeHtml(p) + '</b> (' + c + ')').join(', ') +
-          ' — worth a focused review if one keeps showing up.</div>';
-      }
-      if (lexileEntries.length) {
-        html += '<div class="insight-line">📖 Approximate Lexile® range of missed words (by syllable complexity): ' +
-          lexileEntries.map(([l, c]) => '<b>' + escapeHtml(l) + '</b> (' + c + ')').join(', ') + '.</div>';
-      }
-
-      let tableHtml = '<div style="overflow-x:auto"><table class="timing-table"><thead><tr>' +
-        '<th>Word</th><th>Result</th><th>Phonics pattern(s)</th><th>Approx. Lexile® band</th>' +
-        '</tr></thead><tbody>';
-      detail.forEach(d => {
-        tableHtml += '<tr>' +
-          '<td>' + escapeHtml(d.word) + '</td>' +
-          '<td class="status-cell ' + d.status + '">' + d.status + '</td>' +
-          '<td>' + d.patterns.map(escapeHtml).join(', ') + '</td>' +
-          '<td>' + escapeHtml(d.lexile) + '</td>' +
-          '</tr>';
-      });
-      tableHtml += '</tbody></table></div>';
-      tableHtml += '<div class="insight-line" style="margin-top:10px;opacity:0.75">' +
-        'These tags are spelling-pattern and syllable-count heuristics, not a verified phonics assessment or an ' +
-        'official Lexile® measurement — treat them as a starting point for what to review, not a diagnosis.</div>';
-      html += wrapDetails('Show missed-word details (' + missed.length + ')', tableHtml);
-    }
-
-    html += renderHelperModeSection(helperFollowUp);
-    html += renderRepeatedWordSection();
-
-    analysisPanel.innerHTML = html;
-    analysisPanel.classList.add('show');
-  }
-
-  // Overall fluency-based Lexile estimate + DIBELS-style grade benchmark for this session —
-  // see estimateOverallLexile/benchmarkStatus for how these numbers are derived.
-  function renderOverallLexileSection() {
-    if (lastOverallLexile == null) return '';
-    let html = '<div class="insight-line">📖 Estimated overall reading level for this session: ' +
-      '<b>' + formatLexile(lastOverallLexile) + '</b> (Lexile®-style, based on reading fluency — like a DIBELS-style ' +
-      'oral reading fluency check, not a certified Lexile® measurement, which normally comes from a separate ' +
-      'comprehension-based assessment).</div>';
-    if (lastBenchmark) {
-      html += '<div class="insight-line">🎯 Grade ' + escapeHtml(lastGradeLevel) + ' fluency benchmark ' +
-        '(Hasbrouck-Tindal, Spring 50th percentile = ' + lastBenchmark.target + ' WCPM): <b>' +
-        escapeHtml(lastBenchmark.tier) + '</b> (' + Math.round(lastBenchmark.pct * 100) + '% of target' +
-        (lastWcpm != null ? ', at ' + lastWcpm + ' WCPM' : '') + ').</div>';
-    } else if (lastGradeLevel === 'K') {
-      html += '<div class="insight-line" style="opacity:0.75">🎯 No fluency benchmark for Kindergarten — WCPM norms ' +
-        'conventionally start at Grade 1.</div>';
-    }
-    return html;
-  }
-
-  // Did a helper-mode prompt actually teach the word? Shows every word that needed the
-  // text-to-speech prompt this session, and — when the same word comes up again later in the
-  // passage — whether the reader then got it on their own.
-  function renderHelperModeSection(helperFollowUp) {
-    if (!helperFollowUp.length) return '';
-
-    const appliedCount = helperFollowUp.filter(h => h.outcome === 'applied').length;
-
-    let html = '<h3 style="margin-top:18px">Helper mode — did it stick?</h3>';
-    html += '<div class="insight-line">🗣️ ' + helperFollowUp.length + ' word' + (helperFollowUp.length > 1 ? 's needed' : ' needed') +
-      ' a helper-mode prompt this session' +
-      (appliedCount ? ', and ' + appliedCount + ' of them ' + (appliedCount > 1 ? 'were' : 'was') +
-        ' read correctly on their own the next time it came up — looks like it stuck' : '') + '.</div>';
-
-    let tableHtml = '<div style="overflow-x:auto"><table class="timing-table"><thead><tr>' +
-      '<th>Word</th><th>What happened next time</th>' +
-      '</tr></thead><tbody>';
-    const NOTES = {
-      applied: '✅ Read correctly on its own the next time — looks like it stuck.',
-      'needed-help-again': '🔁 Needed the helper prompt again the next time it came up.',
-      'missed-again': '⚠️ Came up again but was still missed without help.',
-      'not-yet-reached': '⏳ Appears again later in the passage, but the session ended before getting there.',
-      'no-repeat': '— Doesn’t appear again in this passage.'
-    };
-    helperFollowUp.forEach(h => {
-      tableHtml += '<tr>' +
-        '<td>' + escapeHtml(h.word) + '</td>' +
-        '<td>' + (NOTES[h.outcome] || '—') + '</td>' +
-        '</tr>';
-    });
-    tableHtml += '</tbody></table></div>';
-    html += wrapDetails('Show helper-mode details (' + helperFollowUp.length + ')', tableHtml);
-    return html;
-  }
-
-  // How often a word that appears more than once in the passage was read incorrectly — a word
-  // missed every time it comes up is a much stronger signal than a word missed once in passing.
-  function renderRepeatedWordSection() {
-    const repeats = computeRepeatedWordAnalysis();
-    if (!repeats.length) return '';
-
-    let html = '<h3 style="margin-top:18px">Repeated words — how often missed</h3>';
-    html += '<div class="insight-line">🔂 ' + repeats.length + ' word' + (repeats.length > 1 ? 's that appear' : ' that appears') +
-      ' more than once in this passage ' + (repeats.length > 1 ? 'were' : 'was') + ' misread at least once: ' +
-      repeats.slice(0, 5).map(g => '<b>' + escapeHtml(g.word) + '</b> (' + g.incorrect + '/' + g.total + ')').join(', ') + '.</div>';
-
-    let tableHtml = '<div style="overflow-x:auto"><table class="timing-table"><thead><tr>' +
-      '<th>Word</th><th>Times in passage</th><th>Incorrect</th><th>Corrected</th><th>Helped</th><th>Skipped</th><th>Correct</th><th>Miss rate</th>' +
-      '</tr></thead><tbody>';
-    repeats.forEach(g => {
-      const rate = g.total ? Math.round((g.incorrect / g.total) * 100) : 0;
-      tableHtml += '<tr>' +
-        '<td>' + escapeHtml(g.word) + '</td>' +
-        '<td>' + g.total + '</td>' +
-        '<td class="status-cell incorrect">' + g.incorrect + '</td>' +
-        '<td class="status-cell corrected">' + (g.corrected || '—') + '</td>' +
-        '<td class="status-cell helped">' + (g.helped || '—') + '</td>' +
-        '<td class="status-cell skipped">' + (g.skipped || '—') + '</td>' +
-        '<td class="status-cell correct">' + g.correct + '</td>' +
-        '<td>' + rate + '%</td>' +
-        '</tr>';
-    });
-    tableHtml += '</tbody></table></div>';
-    html += wrapDetails('Show repeated-word details (' + repeats.length + ')', tableHtml);
-    return html;
-  }
-
-  function fmtDuration(ms) {
-    if (ms == null) return '—';
-    return (ms / 1000).toFixed(1) + 's';
-  }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, ch => ({
@@ -2869,71 +1720,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // Wraps a chunk of already-built HTML (typically a data table) behind a collapsed, clickable
   // "show details" toggle — collapsed by default so the short summary sentences above it are
   // what a reader actually sees first, not a wall of tables.
-  function wrapDetails(label, innerHtml) {
-    return '<details class="table-toggle"><summary>' + escapeHtml(label) + '</summary>' +
-      '<div class="table-toggle-body">' + innerHtml + '</div></details>';
-  }
 
-  function renderTimingPanel() {
-    const timed = words.filter(w => w.durationMs != null && (w.status === 'correct' || w.status === 'incorrect' || w.status === 'corrected' || w.status === 'helped' || w.status === 'echoed'));
-    const slowest = [...timed].sort((a, b) => b.durationMs - a.durationMs).slice(0, 3);
-    const mostAttempts = [...words].filter(w => w.attempts > 0).sort((a, b) => b.attempts - a.attempts).slice(0, 3);
-    const slowSet = new Set(slowest);
-    const correctedWords = words.filter(w => w.status === 'corrected');
-    const echoedWords = words.filter(w => w.status === 'echoed');
-
-    let html = '<h3>Time spent per word</h3>';
-
-    if (lastWcpm != null) {
-      html += '<div class="insight-line">⏱ Reading pace: <b>' + lastWcpm + '</b> words correct per minute (WCPM), over ' +
-        fmtDuration(lastElapsedMs) + ' of reading.</div>';
-    }
-    if (slowest.length) {
-      html += '<div class="insight-line">🐢 Took the longest: ' +
-        slowest.map(w => '<b>' + escapeHtml(w.raw) + '</b> (' + fmtDuration(w.durationMs) + ')').join(', ') + '</div>';
-    }
-    if (mostAttempts.length) {
-      html += '<div class="insight-line">🔁 Sounded out the most: ' +
-        mostAttempts.map(w => '<b>' + escapeHtml(w.raw) + '</b> (' + w.attempts + ' attempt' + (w.attempts > 1 ? 's' : '') + ')').join(', ') + '</div>';
-    }
-    if (correctedWords.length) {
-      html += '<div class="insight-line">🩹 ' + correctedWords.length + ' word' + (correctedWords.length > 1 ? 's were' : ' was') +
-        ' auto-corrected by the 2nd-pass check (capture-timing mismatch, not a real misread — see notes below): ' +
-        correctedWords.map(w => '<b>' + escapeHtml(w.raw) + '</b>').join(', ') + '.</div>';
-    }
-    if (echoedWords.length) {
-      html += '<div class="insight-line">🗣️ ' + echoedWords.length + ' word' + (echoedWords.length > 1 ? 's were' : ' was') +
-        ' read after a choral-mode lead-in (not counted toward WCPM, since the device read it first).</div>';
-    }
-
-    let tableHtml = '<div style="overflow-x:auto"><table class="timing-table"><thead><tr>' +
-      '<th>Word</th><th>Result</th><th>Time on word</th><th>Sound-out attempts</th><th>What was captured</th><th>2nd-pass note</th>' +
-      '</tr></thead><tbody>';
-    words.forEach(w => {
-      const rowClass = slowSet.has(w) ? ' class="slow"' : '';
-      // Surface "what was captured" for anything flagged (incorrect) or reclassified (corrected)
-      // — that's the diagnostic case (what did the recognizer hear that didn't match?). Dedupe
-      // consecutive repeats.
-      let captured = '—';
-      if ((w.status === 'incorrect' || w.status === 'corrected') && w.heard.length) {
-        const deduped = w.heard.filter((tok, i) => tok !== w.heard[i - 1]);
-        captured = '“' + escapeHtml(deduped.join(' ')) + '”';
-      }
-      tableHtml += '<tr' + rowClass + '>' +
-        '<td>' + escapeHtml(w.raw) + '</td>' +
-        '<td class="status-cell ' + w.status + '">' + w.status + '</td>' +
-        '<td>' + fmtDuration(w.durationMs) + '</td>' +
-        '<td>' + (w.attempts || '—') + '</td>' +
-        '<td>' + captured + '</td>' +
-        '<td style="max-width:260px">' + (w.correctionNote ? escapeHtml(w.correctionNote) : '—') + '</td>' +
-        '</tr>';
-    });
-    tableHtml += '</tbody></table></div>';
-    html += wrapDetails('Show word-by-word timing table (' + words.length + ' words)', tableHtml);
-
-    timingPanel.innerHTML = html;
-    timingPanel.classList.add('show');
-  }
 
   // ---------- session log ----------
   function storageAvailable() {
@@ -2948,107 +1735,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
   const canPersistLog = storageAvailable();
 
-  function loadLog() {
-    if (!canPersistLog) return;
-    try {
-      const raw = localStorage.getItem(LOG_STORAGE_KEY);
-      if (raw) sessionLog = JSON.parse(raw);
-    } catch (e) {
-      sessionLog = [];
-    }
-  }
 
-  function saveLog() {
-    if (!canPersistLog) return;
-    try { localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(sessionLog)); } catch (e) { /* storage full or blocked — log still lives in memory for this visit */ }
-  }
 
-  function updateLogStatusLine() {
-    const n = sessionLog.length;
-    const countText = n === 0 ? 'No sessions logged yet.' : (n + ' session' + (n === 1 ? '' : 's') + ' logged.');
-    logStatusLine.textContent = countText + (canPersistLog
-      ? ' Saved in this browser — export a copy before you clear your browser data.'
-      : ' This browser won\'t keep it after the page is closed — export before you\'re done for the day.');
-  }
 
-  function logSession(stats) {
-    const { patternCounts, lexileCounts } = computeMissedAnalysis();
-    const repeatedWordIssues = computeRepeatedWordAnalysis();
-    const helperFollowUp = computeHelperFollowUp();
-    const entry = {
-      id: 'log_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      timestamp: new Date().toISOString(),
-      student: studentNameInput.value.trim(),
-      passage: loadedRawText,
-      total: stats.total,
-      correct: stats.correct,
-      corrected: stats.corrected,
-      helped: stats.helped,
-      echoed: stats.echoed,
-      skipped: stats.skipped,
-      incorrect: stats.incorrect,
-      pct: stats.pct,
-      wcpm: stats.wcpm,
-      elapsedMs: stats.elapsedMs,
-      gradeLevel: stats.gradeLevel,
-      overallLexile: stats.overallLexile,
-      benchmark: stats.benchmark,
-      patternCounts: patternCounts,
-      lexileCounts: lexileCounts,
-      repeatedWordIssues: repeatedWordIssues,
-      helperFollowUp: helperFollowUp,
-      words: words.map(w => ({
-        raw: w.raw, status: w.status, durationMs: w.durationMs, attempts: w.attempts,
-        heard: w.heard.slice(), correctionNote: w.correctionNote, para: w.para,
-        helperTriggered: w.helperTriggered, choralPrompted: w.choralPrompted
-      }))
-    };
-    sessionLog.push(entry);
-    saveLog();
-    renderLogPanel();
-  }
 
-  function renderLogPanel() {
-    updateLogStatusLine();
-    logTableBody.innerHTML = '';
-    if (!sessionLog.length) {
-      const tr = document.createElement('tr');
-      tr.className = 'log-empty';
-      tr.innerHTML = '<td colspan="6">No sessions logged yet — finish a reading above to add one.</td>';
-      logTableBody.appendChild(tr);
-      return;
-    }
-    [...sessionLog].reverse().forEach(entry => {
-      const tr = document.createElement('tr');
-      const when = new Date(entry.timestamp).toLocaleString();
-      tr.innerHTML =
-        '<td>' + escapeHtml(when) + '</td>' +
-        '<td>' + escapeHtml(entry.student || '—') + '</td>' +
-        '<td>' + entry.pct + '%</td>' +
-        '<td>' + entry.correct + '/' + entry.total + '</td>' +
-        '<td>' + (entry.wcpm != null ? entry.wcpm : '—') + '</td>' +
-        '<td></td>';
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn-secondary btn-xs';
-      delBtn.textContent = '✕';
-      delBtn.title = 'Remove this entry';
-      delBtn.addEventListener('click', function () {
-        sessionLog = sessionLog.filter(e => e.id !== entry.id);
-        saveLog();
-        renderLogPanel();
-      });
-      tr.lastElementChild.appendChild(delBtn);
-      logTableBody.appendChild(tr);
-    });
-  }
 
-  function clearLog() {
-    if (!sessionLog.length) return;
-    if (!confirm('Clear all ' + sessionLog.length + ' logged session(s)? This can\'t be undone — export a copy first if you need one.')) return;
-    sessionLog = [];
-    saveLog();
-    renderLogPanel();
-  }
 
   function downloadFile(filename, content, mime) {
     const blob = new Blob([content], { type: mime });
@@ -3067,58 +1758,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     return /[",\n]/.test(s) ? ('"' + s.replace(/"/g, '""') + '"') : s;
   }
 
-  function exportWordCsv() {
-    if (!sessionLog.length) { setStatus('No logged sessions to export yet.', 'warn'); return; }
-    const rows = [['session_id', 'timestamp', 'student', 'session_score_pct', 'word_index', 'word', 'status',
-      'time_on_word_s', 'soundout_attempts', 'helper_mode_used', 'choral_mode_used', 'captured_when_flagged', '2nd_pass_note', 'phonics_patterns', 'approx_lexile_band']];
-    sessionLog.forEach(entry => {
-      entry.words.forEach((w, idx) => {
-        const flagged = (w.status === 'incorrect' || w.status === 'skipped');
-        rows.push([
-          entry.id, entry.timestamp, entry.student, entry.pct,
-          idx, w.raw, w.status,
-          w.durationMs != null ? (w.durationMs / 1000).toFixed(2) : '',
-          w.attempts,
-          w.helperTriggered ? 'yes' : '',
-          w.choralPrompted ? 'yes' : '',
-          (w.heard || []).join(' '),
-          w.correctionNote || '',
-          flagged ? detectPhonicsPatterns(w.raw).join('; ') : '',
-          flagged ? estimateLexileBand(w.raw) : ''
-        ]);
-      });
-    });
-    downloadFile('reading-coach-word-level-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
-  }
 
-  function exportSessionCsv() {
-    if (!sessionLog.length) { setStatus('No logged sessions to export yet.', 'warn'); return; }
-    const rows = [['session_id', 'timestamp', 'student', 'grade_level', 'total_words', 'correct', 'corrected', 'helped', 'echoed', 'skipped', 'incorrect',
-      'pct_correct', 'wcpm', 'elapsed_reading_time_s', 'estimated_overall_lexile', 'grade_benchmark_status', 'grade_benchmark_pct_of_target',
-      'helper_words_applied_later', 'top_phonics_patterns', 'repeated_words_missed', 'full_passage']];
-    sessionLog.forEach(entry => {
-      const top = Object.entries(entry.patternCounts || {}).sort((a, b) => b[1] - a[1]).slice(0, 3)
-        .map(([p, c]) => p + ' (' + c + ')').join('; ');
-      const repeated = (entry.repeatedWordIssues || []).slice(0, 5)
-        .map(g => g.word + ' (' + g.incorrect + '/' + g.total + ')').join('; ');
-      const helperFollowUp = entry.helperFollowUp || [];
-      const helperApplied = helperFollowUp.filter(h => h.outcome === 'applied').length;
-      rows.push([entry.id, entry.timestamp, entry.student, entry.gradeLevel || '', entry.total, entry.correct, entry.corrected || 0,
-        entry.helped || 0, entry.echoed || 0, entry.skipped, entry.incorrect, entry.pct, entry.wcpm != null ? entry.wcpm : '',
-        entry.elapsedMs != null ? (entry.elapsedMs / 1000).toFixed(1) : '',
-        entry.overallLexile != null ? formatLexile(entry.overallLexile) : '',
-        entry.benchmark ? entry.benchmark.tier : '',
-        entry.benchmark ? Math.round(entry.benchmark.pct * 100) : '',
-        helperFollowUp.length ? (helperApplied + '/' + helperFollowUp.length) : '', top, repeated,
-        entry.passage || '']);
-    });
-    downloadFile('reading-coach-session-summary-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
-  }
 
-  function exportJsonLog() {
-    if (!sessionLog.length) { setStatus('No logged sessions to export yet.', 'warn'); return; }
-    downloadFile('reading-coach-log-' + Date.now() + '.json', JSON.stringify(sessionLog, null, 2), 'application/json');
-  }
 
   // ---------- exam mode ----------
   // A student loads a PDF question; its text comes out via PDF.js (or Tesseract.js OCR when the
@@ -4651,6 +3292,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     if (!q) return;
     examCurrentOptionIndex = -1;
     examEngineTarget = null;
+    examDebugHeardSoFar = '';
+    examDebugResetLogs();
+    examDebugRenderCapture(examDebugHeardSoFar);
 
     // Swap the passage card to match this question's own — a no-op rebuild when it's the same text
     // already showing (see examSetActivePassage), which is the common case for a passage several
@@ -5685,6 +4329,77 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // ---- exam-mode helper prompt: mirrors Read mode's helper-mode timer/click pattern, but with a
   // fixed 3-second delay (no configurable dropdown) and generalized to whichever target — question
   // stem or answer option — the shared engine is currently reading. ----
+  // ---- exam-mode choral mode: mirrors Read mode's choral mode (a short phrase is read aloud
+  // first, then the reader repeats it back) — see maybeNarrateChoralChunk for the Read mode
+  // original. This is a fresh, independent implementation: it chunks whichever word list the
+  // shared exam engine is currently tracking (examEngineWords — the stem, an option, or the
+  // passage), rather than reusing Read mode's own choral functions, which are scoped to Read
+  // mode's own `words`/`loadedRawText` globals and must stay untouched. Deliberately skips Read
+  // mode's NLP-based phrase-boundary hinting (computeChoralHints): the exam engine re-chunks every
+  // time it switches target (stem → option → next option → …), and re-running NLP parsing that
+  // often — for what's usually short answer-choice text anyway — isn't worth the added complexity,
+  // so the same plain punctuation/length rule Read mode itself falls back to without NLP is used
+  // here unconditionally instead.
+  const EXAM_CHORAL_MAX_CHUNK = 4;
+  function examBuildChoralChunks(wordsArr) {
+    const chunks = [];
+    const n = wordsArr.length;
+    let i = 0;
+    while (i < n) {
+      let end = i + 1;
+      while (end < n && (end - i) < EXAM_CHORAL_MAX_CHUNK) {
+        if (/[.,;:!?]$/.test(wordsArr[end - 1].raw)) break; // punctuation always ends the phrase
+        if ((end - i) >= 3) break;                          // default target: 2-3 words
+        end++;
+      }
+      chunks.push({ start: i, end: end });
+      i = end;
+    }
+    return chunks;
+  }
+
+  let examChoralChunks = [];
+  let examChoralNarratedChunkEnd = -1;
+  // True right after a new target loads or a passage read restarts from scratch — tells
+  // examMaybeNarrateChoralChunk to rebuild chunk boundaries (and forget what's already been
+  // narrated) the next time it's asked to do anything, rather than tracking this by comparing
+  // array references, which would miss the case of the SAME word array being reused for a second
+  // read (replaying the same option/stem from scratch) after already having chunks/narrated-so-far
+  // state left over from the first read.
+  let examChoralChunksStale = true;
+  function examInvalidateChoralState() {
+    examChoralChunksStale = true;
+    examChoralNarratedChunkEnd = -1;
+  }
+
+  // Same baseline (~150 wpm ≈ rate 1) and clamp Read mode's choralRateFromWcpm uses, kept as its
+  // own copy rather than a shared helper so nothing here ever has to reach into Read mode's code.
+  function examChoralRateFromWcpm(wcpm) {
+    const baselineWpm = 150;
+    return Math.max(0.5, Math.min(2, wcpm / baselineWpm));
+  }
+
+  function examMaybeNarrateChoralChunk() {
+    if (!examChoralModeToggle.checked || !examEngineListening) return;
+    if (examEnginePointer >= examEngineWords.length) return;
+    if (examChoralChunksStale) {
+      examChoralChunks = examBuildChoralChunks(examEngineWords);
+      examChoralChunksStale = false;
+    }
+    if (examEnginePointer < examChoralNarratedChunkEnd) return; // this chunk was already read aloud
+    const chunk = examChoralChunks.find(c => examEnginePointer >= c.start && examEnginePointer < c.end);
+    if (!chunk) return;
+    examChoralNarratedChunkEnd = chunk.end;
+    for (let i = chunk.start; i < chunk.end; i++) examEngineWords[i].choralPrompted = true;
+    const phrase = examEngineWords.slice(chunk.start, chunk.end).map(w => w.raw).join(' ');
+    const wcpmTarget = parseInt(examChoralWcpmInput.value, 10) || 100;
+    // speakTts sets the shared ttsSpeaking/muteRecognitionUntil state the recognizer's own onresult
+    // already checks (see examEngineRecognition.onresult's `muted` check), so the device's own
+    // voice is never picked back up and mistaken for the reader's — same mechanism
+    // examEngineSpeakCorrection/examTriggerHelperPrompt below already rely on.
+    setTimeout(function () { speakTts(phrase, examChoralRateFromWcpm(wcpmTarget)); }, 30);
+  }
+
   let examHelperTimerHandle = null;
 
   function examClearHelperTimer() {
@@ -5709,6 +4424,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examScheduleHelperTimer() {
     examClearHelperTimer();
     if (!examEngineListening) return;
+    // examHelperModeToggle gates the whole automatic system (both the silence-triggered prompt and
+    // the "still stuck — move on" follow-up that comes after it) — manually clicking the current
+    // word for help (examRequestHelpForWord) is unaffected either way, exactly like Read mode's own
+    // helper mode checkbox only gates its own auto-timer, never the manual "click for help" path.
+    if (!examHelperModeToggle.checked) return;
     if (examEnginePointer >= examEngineWords.length) return;
     const word = examEngineWords[examEnginePointer];
     if (!word || word.status !== 'pending') return;
@@ -5757,6 +4477,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examEnginePointer++;
     examEngineRenderCallback();
     examScheduleHelperTimer();
+    examMaybeNarrateChoralChunk();
     if (examEnginePointer >= examEngineWords.length) examEngineFinish();
   }
 
@@ -5772,24 +4493,41 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examTriggerHelperPrompt(word, 'manual');
   }
 
+  // Short filler words that continuous speech recognition is prone to hallucinating at an
+  // utterance boundary — a stray "the" tacked onto the front of the next real word, an "um"/"uh"
+  // picked up from a breath, and so on — rather than something the reader actually said as a
+  // distinct extra word. Deliberately short and limited to filler specifically: a genuine
+  // misreading that happens to insert some OTHER word (not on this list) still counts as a wrong
+  // attempt, same as always — this only forgives the handful of words ASR noise most often invents.
+  const EXAM_ASR_FILLER_WORDS = new Set(['a', 'an', 'the', 'um', 'uh', 'uhh', 'umm', 'er', 'ah', 'hmm', 'mm', 'mhm']);
+
   function examProcessWord(rawWord) {
     const norm = examNormalize(rawWord);
     if (!norm || examEnginePointer >= examEngineWords.length) return;
 
-    // A skipped word is currently "offered" for correction — if this is the reader repeating it
-    // back (independent of wherever the pointer has since moved to), upgrade it to 'helped' and
-    // stop tracking it, without otherwise disturbing the pointer's normal progress.
-    if (examEngineCorrectionWord && examEngineCorrectionWord !== examEngineWords[examEnginePointer] &&
-        isMatch(examEngineCorrectionWord.norm, norm)) {
-      examEngineCorrectionWord.status = 'helped';
-      examEngineCorrectionWord = null;
-      examEngineRenderCallback();
-      return;
+    // Any skipped words are currently "offered" for correction — if this is the reader repeating
+    // one of them back (independent of wherever the pointer has since moved to, and independent of
+    // how long ago it was skipped), upgrade it to 'helped' and stop tracking it, without otherwise
+    // disturbing the pointer's normal progress.
+    for (let ci = 0; ci < examEngineCorrectionWords.length; ci++) {
+      const correctionWord = examEngineCorrectionWords[ci];
+      if (correctionWord !== examEngineWords[examEnginePointer] && isMatch(correctionWord.norm, norm)) {
+        correctionWord.status = 'helped';
+        examEngineCorrectionWords.splice(ci, 1);
+        examDebugAppendHeard(correctionWord.raw);
+        examEngineRenderCallback();
+        return;
+      }
     }
 
     if (isMatch(examEngineWords[examEnginePointer].norm, norm)) {
       const w = examEngineWords[examEnginePointer];
-      w.status = w.helperTriggered ? 'helped' : 'correct';
+      // Helper-mode assistance takes precedence if somehow both were triggered on the same word
+      // (shouldn't normally happen — see the mutual-exclusivity change listeners below — but a
+      // reader can still manually click for help while Choral mode is on, which sets
+      // helperTriggered independent of that toggle).
+      w.status = w.helperTriggered ? 'helped' : (w.choralPrompted ? 'echoed' : 'correct');
+      examDebugAppendHeard(w.raw);
       examEnginePointer++;
     } else {
       let found = -1;
@@ -5798,35 +4536,76 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       }
       if (found >= 0) {
         const skippedCount = found - examEnginePointer;
-        for (let k = examEnginePointer; k < found; k++) examEngineWords[k].status = 'skipped';
+        for (let k = examEnginePointer; k < found; k++) {
+          examEngineWords[k].status = 'skipped';
+          // Every skipped word stays "offered" for correction (see the lookup at the top of this
+          // function), no matter how many were skipped at once — not just when exactly one was.
+          // Without this, a reader who circles back later to say a word from a multi-word skip run
+          // gets no credit for it, and worse, that later attempt can land on whatever word the
+          // pointer has since moved to and wrongly burn through ITS two-strikes budget instead (the
+          // original bug report this fixes: skipping ahead past "Mr. Lee tell" left both unresolved,
+          // and the reader's own later "Mr"/"Lee" — picked up seconds afterward — got wrongly
+          // charged as two wrong attempts against "not", the actual current word at the time).
+          examEngineCorrectionWords.push(examEngineWords[k]);
+        }
         examEngineWords[found].status = 'correct';
+        examDebugAppendHeard(examEngineWords[found].raw);
         examEnginePointer = found + 1;
-        // Only offer a spoken correction for a single skipped word — with a multi-word skip run
-        // there's no reliable single word to prompt a repeat of. Skip the spoken prompt too if the
-        // word was already read aloud this turn (e.g. by the 3-second silence timer just before it
-        // got skipped over) so it isn't said twice in a row.
+        // Only SPEAK a correction for a single skipped word — with a multi-word skip run there's no
+        // reliable single word to prompt a repeat of aloud (though every word in the run is still
+        // silently offered for correction above). Skip the spoken prompt too if the word was already
+        // read aloud this turn (e.g. by the 3-second silence timer just before it got skipped over)
+        // so it isn't said twice in a row.
         if (skippedCount === 1) {
           const skippedWord = examEngineWords[found - 1];
-          examEngineCorrectionWord = skippedWord;
           if (!skippedWord.helperTriggered) examEngineSpeakCorrection(skippedWord);
         }
       } else {
-        examEngineWords[examEnginePointer].heard.push(rawWord);
-        examEngineWords[examEnginePointer].attempts++;
-        // Only speak a correction on the first wrong attempt if the word hasn't already been read
-        // aloud this turn (by the auto silence-timer or a manual help click) — otherwise a wrong
-        // attempt landing right after either of those prompts makes the device say the word twice.
-        if (examEngineWords[examEnginePointer].attempts === 1 && !examEngineWords[examEnginePointer].helperTriggered) {
-          examEngineSpeakCorrection(examEngineWords[examEnginePointer]);
+        // Before charging this as a wrong attempt at the CURRENT word, check whether it's instead
+        // an echo of one of the last few words already resolved — e.g. a reader who stutters, or
+        // who repeats a word right after being corrected on it (the correctionWord branch above
+        // only catches the FIRST repeat; a second "dark" after "dark, dark cloud" falls through to
+        // here, with the pointer having already moved on to "covered"). Mirrors the forward
+        // skip-ahead lookup just above, but looking backward instead — mistaking a trailing echo
+        // for a fresh attempt would otherwise falsely burn through this word's two-strikes budget
+        // and mark it incorrect without the reader ever having actually attempted it.
+        let echoed = false;
+        let echoedWord = null;
+        for (let d = 1; d <= 3 && examEnginePointer - d >= 0; d++) {
+          if (isMatch(examEngineWords[examEnginePointer - d].norm, norm)) { echoed = true; echoedWord = examEngineWords[examEnginePointer - d]; break; }
         }
-        if (examEngineWords[examEnginePointer].attempts >= 2) {
-          examEngineWords[examEnginePointer].status = 'incorrect';
-          examEnginePointer++;
+        // A short filler word that doesn't match the current word, isn't coming up in the next
+        // few, and isn't an echo either, is far more likely to be the recognizer inventing a
+        // stray "the"/"um" than the reader genuinely ad-libbing one — ignore it rather than
+        // charging the actual next word with an attempt it never really got. A non-filler
+        // insertion (a real extra word) still falls through to the normal wrong-attempt handling
+        // below, same as always.
+        const isLikelyAsrNoise = !echoed && EXAM_ASR_FILLER_WORDS.has(norm);
+        // Still worth showing in the transcript either way — an echo, filler noise, and a genuine
+        // wrong attempt were all actually picked up by the mic. An echo gets the word it echoed's
+        // own punctuated form (the known target it matched); anything else (filler noise, or a
+        // genuine wrong attempt with no matching target to borrow punctuation from) just shows the
+        // bare word as heard.
+        examDebugAppendHeard(echoed ? echoedWord.raw : rawWord);
+        if (!echoed && !isLikelyAsrNoise) {
+          examEngineWords[examEnginePointer].heard.push(rawWord);
+          examEngineWords[examEnginePointer].attempts++;
+          // Only speak a correction on the first wrong attempt if the word hasn't already been read
+          // aloud this turn (by the auto silence-timer or a manual help click) — otherwise a wrong
+          // attempt landing right after either of those prompts makes the device say the word twice.
+          if (examEngineWords[examEnginePointer].attempts === 1 && !examEngineWords[examEnginePointer].helperTriggered) {
+            examEngineSpeakCorrection(examEngineWords[examEnginePointer]);
+          }
+          if (examEngineWords[examEnginePointer].attempts >= 2) {
+            examEngineWords[examEnginePointer].status = 'incorrect';
+            examEnginePointer++;
+          }
         }
       }
     }
     examEngineRenderCallback();
     examScheduleHelperTimer();
+    examMaybeNarrateChoralChunk();
     if (examEnginePointer >= examEngineWords.length) examEngineFinish();
   }
 
@@ -5852,11 +4631,15 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   function examEngineLoad(target, wordsArrRef, onDone) {
     examClearHelperTimer();
     examEngineTarget = target;
+    examDebugHeardSoFar = '';
+    examDebugSyncOwnerTranscript(examDebugHeardSoFar);
+    examDebugRenderCapture(examDebugHeardSoFar);
     examEngineWords = wordsArrRef;
     examEnginePointer = 0;
-    examEngineWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; });
+    examEngineWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; w.choralPrompted = false; });
     examEngineOnDone = onDone;
-    examEngineCorrectionWord = null;
+    examEngineCorrectionWords = [];
+    examInvalidateChoralState();
   }
 
   // Play buttons for the question and every answer choice are all live at once now (and stay
@@ -5887,11 +4670,18 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       // Either a genuinely fresh, never-played passage (already all-pending — this is a no-op), or
       // the "everything already read, restart from scratch" case above — either way, word 0 being
       // the resume point means there's no partial progress worth preserving.
-      examPassageWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; });
+      examPassageWords.forEach(w => { w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; w.choralPrompted = false; });
+      examInvalidateChoralState(); // a genuine restart — forget whatever was already narrated
+      examDebugHeardSoFar = ''; // ...and forget the running transcript along with it
+      examDebugSyncOwnerTranscript(examDebugHeardSoFar);
     }
     examEnginePointer = resumeIdx;
     examEngineOnDone = onDone;
-    examEngineCorrectionWord = null;
+    examEngineCorrectionWords = [];
+    // Resuming (unlike a restart) deliberately does NOT clear examDebugHeardSoFar above — just
+    // re-render it now that examEngineTarget is set, so the existing transcript reappears under
+    // the passage's own capture line immediately rather than waiting for the next onresult.
+    examDebugRenderCapture(examDebugHeardSoFar);
   }
 
   // examEngineListening flips true here — synchronously, the moment Play is pressed — rather than
@@ -6234,10 +5024,22 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   }
 
   const ExamSR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // The one persistent "your browser doesn't support this" banner (#unsupported, shown at the top
+  // of the page) used to be wired to Read mode's own speech-recognition setup, back when this app
+  // had two modes. Now that Exam mode is the only mode, this is that same banner's new (and only)
+  // trigger — Exam mode's own Play buttons already show an inline fallback message on click (see
+  // examQuestionPlayBtn's handler), but surfacing it up front, before the reader even tries, is
+  // still worth keeping.
+  if (!ExamSR) {
+    unsupported.style.display = 'block';
+  }
   if (ExamSR) {
     examEngineRecognition = new ExamSR();
     examEngineRecognition.continuous = true;
-    examEngineRecognition.interimResults = false; // simpler than Read mode: act only on finalized results
+    // Interim results are only turned on so the live capture transcript has something to display —
+    // the scoring logic below still only ever acts on isFinal results, so this doesn't change
+    // matching/scoring behavior at all.
+    examEngineRecognition.interimResults = true;
     examEngineRecognition.lang = 'en-US';
 
     examEngineRecognition.onstart = function () {
@@ -6245,18 +5047,34 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       // first point we know the recognizer is actually running, so the real give-up countdown
       // starts here, not at the click.
       examScheduleHelperTimer();
+      examMaybeNarrateChoralChunk();
+      examDebugRenderCapture(examDebugHeardSoFar);
     };
     examEngineRecognition.onresult = function (event) {
       let finalTranscript = '';
+      let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript + ' ';
+        else interimTranscript += event.results[i][0].transcript + ' ';
       }
       // Ignore anything picked up while the device itself is speaking a correction (plus a short
       // grace period after) — otherwise the exam engine's own TTS voice gets transcribed and
       // mistaken for the reader's speech.
       const muted = ttsSpeaking || Date.now() < muteRecognitionUntil;
-      if (muted) return;
+      if (muted) {
+        // Not added to the running transcript below — it was never used for matching/scoring, so
+        // it shouldn't appear as part of "the full text being assessed" either. Still worth a
+        // visible marker so a muted stretch doesn't look like dead air.
+        examDebugRenderCapture(examDebugHeardSoFar + (examDebugHeardSoFar ? ' ' : '') + '(muted — ignored)');
+        return;
+      }
+      // Each finalized word gets appended to the running transcript by examProcessWord itself, as
+      // it's processed (see examDebugAppendHeard) — using the MATCHED target word's own punctuated
+      // text (e.g. "water?") when the heard word resolves against one, rather than the bare word
+      // the recognizer returned, which rarely carries punctuation of its own for a short recognized
+      // phrase. Only the still-interim tail (not yet run through matching) is appended here, live.
       finalTranscript.trim().split(/\s+/).filter(Boolean).forEach(examProcessWord);
+      examDebugRenderCapture(examDebugHeardSoFar + (interimTranscript.trim() ? (examDebugHeardSoFar ? ' ' : '') + interimTranscript.trim() : ''));
     };
     examEngineRecognition.onerror = function (event) {
       if (event.error === 'no-speech' || event.error === 'audio-capture') return;
@@ -6271,6 +5089,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         examUpdatePlayButtons();
         examEngineRenderCallback();
       }
+      examDebugRenderCapture('(recognition error: ' + event.error + ')');
     };
     examEngineRecognition.onend = function () {
       if (!examEngineUserStopped) {
@@ -6281,6 +5100,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         examClearHelperTimer();
         examUpdatePlayButtons();
         examEngineRenderCallback();
+        // Passes the accumulator, not '' — stopping shouldn't erase the transcript already
+        // gathered; examDebugRenderCapture only falls back to "(not listening)" when it's empty.
+        examDebugRenderCapture(examDebugHeardSoFar);
       }
     };
   }
@@ -6311,6 +5133,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examEngineStop();
       return;
     }
+    // Archive whatever the PREVIOUSLY active target (the stem, or a different/the same answer
+    // choice) had accumulated — must happen before examCurrentOptionIndex/examEngineTarget change
+    // below, since examDebugFinalizeLog reads both to know which log (and which label) to file it
+    // under.
+    examDebugFinalizeLog();
     q.options[idx].revealed = true;
     q.options[idx].mode = examSpeakerMode ? 'speaker' : 'read';
     examCurrentOptionIndex = idx;
@@ -6323,7 +5150,16 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const q = examActiveQuestion();
     if (!q) return;
     q.options[idx].scored = true;
-    if (examCurrentOptionIndex === idx) examCurrentOptionIndex = -1;
+    // Archive this option's finished transcript into the permanent on-screen log BEFORE resetting
+    // examCurrentOptionIndex below — examDebugRenderCapture only shows a "live" line for an option
+    // while examCurrentOptionIndex points at it, so without archiving here first, a read that
+    // finishes on its own (rather than being interrupted by the reader starting a different one)
+    // would otherwise vanish from the screen the instant it completes.
+    if (examCurrentOptionIndex === idx) {
+      examDebugFinalizeLog();
+      examCurrentOptionIndex = -1;
+      examDebugRenderCapture(examDebugHeardSoFar); // reflect the archive immediately, not just whenever the async recognition.stop() cycle's onend next re-renders
+    }
     examAnswerStatus.textContent = q.options.every(o => o.scored)
       ? ('All answer choices read — choose your answer' + (q.multiSelect ? 's' : '') + ' below.')
       : 'Nice — play any other choice, or read this one again anytime.';
@@ -6413,6 +5249,42 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     });
   }
 
+  // Every finalized reading of a stem/option, in order, plus whatever's still live and not yet
+  // archived (see examDebugFinalizeLog) — the exact same set of lines the on-screen log shows for
+  // that owner, just read from storage that survives question navigation instead of the transient
+  // examDebugQuestionLog/examDebugOptionLog arrays (which reset per question). A reader who played
+  // an answer choice twice gets both readings here, not just the most recent one.
+  function examPdfOwnerHeardLines(owner) {
+    if (!owner) return [];
+    const lines = (owner.heardTranscriptLines || []).slice();
+    if (owner.heardTranscript && owner.heardTranscript.trim()) lines.push(owner.heardTranscript.trim());
+    return lines;
+  }
+
+  // One small gray italic "Heard: ..." line per past reading — the PDF record of everything the
+  // live capture transcript showed on screen for whichever stem/option/passage this is called for
+  // (see examPdfOwnerHeardLines). `lines` may be a single string (the passage's own case — it keeps
+  // one running line rather than a log of several, see examDebugRenderCapture) or an array of
+  // strings. A no-op when there's nothing to show (Speaker-mode-only reading never populates a
+  // transcript at all), so a document that never used Read/listen mode renders exactly as it always
+  // has — no empty "Heard:" clutter.
+  function examPdfWriteHeardTranscript(doc, lines, cursor, opts) {
+    const list = (Array.isArray(lines) ? lines : (lines ? [lines] : [])).filter(function (t) { return t && t.trim(); });
+    if (!list.length) return;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    list.forEach(function (text) {
+      const wrapped = doc.splitTextToSize('Heard: ' + text.trim(), opts.maxX - opts.startX);
+      wrapped.forEach(function (line) {
+        if (cursor.y > opts.pageBottom) { doc.addPage(); cursor.y = opts.pageTop; }
+        doc.text(line, opts.startX, cursor.y);
+        cursor.y += 12;
+      });
+    });
+    cursor.y += 4;
+  }
+
   // Purple wavy underline on an edited passage word in the PDF — the paper equivalent of the
   // on-screen .word.markup-edit treatment (see its own CSS comment).
   const EXAM_PDF_MARKUP_UNDERLINE_COLOR = [147, 51, 234];
@@ -6496,6 +5368,8 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       cursor.x = startX;
       examPdfFlowWords(doc, examWordsToPdfEntries(q.words), cursor, flowOpts);
       cursor.y += 6;
+      cursor.x = startX;
+      examPdfWriteHeardTranscript(doc, examPdfOwnerHeardLines(q), cursor, flowOpts);
 
       // This question's attached picture/table/chart crops (see examDetectAndInsertPageImages),
       // between the question text and the notes/answer-choices below it — same placement the
@@ -6548,6 +5422,16 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         cursor.x += doc.getTextWidth(marker);
         doc.setFont('helvetica', isSelected ? 'bold' : 'normal');
         examPdfFlowWords(doc, examWordsToPdfEntries(opt.words, keywordSet), cursor, flowOpts);
+        // Only breaks onto its own line when there's actually a transcript to show (Speaker-mode-
+        // only options never get one) — so a document with no Read/listen-mode options keeps the
+        // exact same packed layout it always has. Every past reading of this option gets its own
+        // "Heard:" line (examPdfOwnerHeardLines), not just whichever one happened last.
+        const optHeardLines = examPdfOwnerHeardLines(opt);
+        if (optHeardLines.length) {
+          cursor.x = startX;
+          cursor.y += flowOpts.lineHeight;
+          examPdfWriteHeardTranscript(doc, optHeardLines, cursor, flowOpts);
+        }
       });
 
       cursor.x = startX;
@@ -6600,6 +5484,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         paraWords.push(passageEntries[i]);
       });
       if (paraWords.length) examPdfFlowWords(doc, paraWords, cursor, flowOpts);
+      // Only breaks onto its own line when there's actually a transcript to show (a Speaker-mode-
+      // only passage read never gets one) — so a document that never listened to the passage keeps
+      // the exact same layout it always has.
+      if (examPassageHeardTranscript && examPassageHeardTranscript.trim()) {
+        cursor.y += flowOpts.lineHeight;
+        cursor.x = startX;
+        examPdfWriteHeardTranscript(doc, examPassageHeardTranscript, cursor, flowOpts);
+      }
     }
 
     doc.save(examResultsFileName());
@@ -6656,7 +5548,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   // the one utterance that actually satisfied the match.
   function examLogCapturedText(w) {
     const heardTrail = (w.heard || []).filter(function (tok, i) { return tok !== w.heard[i - 1]; });
-    if (w.status === 'correct' || w.status === 'helped') {
+    if (w.status === 'correct' || w.status === 'helped' || w.status === 'echoed') {
       return heardTrail.length ? heardTrail.concat(w.raw).join(' → ') : w.raw;
     }
     if (w.status === 'incorrect') {
@@ -6705,23 +5597,27 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     const total = flatWords.length;
     const correct = flatWords.filter(function (w) { return w.status === 'correct'; }).length;
     const helped = flatWords.filter(function (w) { return w.status === 'helped'; }).length;
+    const echoed = flatWords.filter(function (w) { return w.status === 'echoed'; }).length;
     const skipped = flatWords.filter(function (w) { return w.status === 'skipped'; }).length;
     const incorrect = flatWords.filter(function (w) { return w.status === 'incorrect'; }).length;
-    const pct = total ? Math.round(((correct + helped) / total) * 100) : 0;
+    // Helped and echoed words both still count toward the overall score — same treatment as Read
+    // mode's own finishSession — they just carry a distinct status so it's clear support was given.
+    const pct = total ? Math.round(((correct + helped + echoed) / total) * 100) : 0;
     const entry = {
       id: 'examlog_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       timestamp: new Date().toISOString(),
       student: examStudentNameInput.value.trim(),
       totalQuestions: examQuestions.length,
       mode: examOverallModeSummary(flatWords),
-      total: total, correct: correct, helped: helped, skipped: skipped, incorrect: incorrect, pct: pct,
+      total: total, correct: correct, helped: helped, echoed: echoed, skipped: skipped, incorrect: incorrect, pct: pct,
       helperManual: flatWords.filter(function (w) { return w.helperSource === 'manual'; }).length,
       helperAuto: flatWords.filter(function (w) { return w.helperSource === 'auto'; }).length,
       helperWrongAttempt: flatWords.filter(function (w) { return w.helperSource === 'wrong-attempt'; }).length,
       words: flatWords.map(function (w) {
         return {
           question: w.question, part: w.part, mode: w.mode, raw: w.raw, status: w.status, attempts: w.attempts,
-          heard: (w.heard || []).slice(), helperTriggered: w.helperTriggered, helperSource: w.helperSource
+          heard: (w.heard || []).slice(), helperTriggered: w.helperTriggered, helperSource: w.helperSource,
+          choralPrompted: w.choralPrompted
         };
       })
     };
@@ -6773,7 +5669,7 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
         '<td>' + escapeHtml(when) + '</td>' +
         '<td>' + escapeHtml(entry.student || '—') + '</td>' +
         '<td>' + entry.pct + '%</td>' +
-        '<td>' + (entry.correct + entry.helped) + '/' + entry.total + '</td>' +
+        '<td>' + (entry.correct + entry.helped + (entry.echoed || 0)) + '/' + entry.total + '</td>' +
         '<td>' + helpUsed + '</td>' +
         '<td></td>';
       const delBtn = document.createElement('button');
@@ -6824,11 +5720,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   function examExportSessionCsv() {
     if (!examSessionLog.length) { examLogStatusLine.textContent = 'No logged sessions to export yet.'; return; }
-    const rows = [['session_id', 'timestamp', 'student', 'mode', 'total_questions', 'total_words', 'correct', 'helped', 'skipped', 'incorrect',
+    const rows = [['session_id', 'timestamp', 'student', 'mode', 'total_questions', 'total_words', 'correct', 'helped', 'echoed', 'skipped', 'incorrect',
       'pct_correct', 'help_manual_clicks', 'help_auto_silence', 'help_after_wrong_attempt']];
     examSessionLog.forEach(function (entry) {
       const modeText = entry.mode === 'mixed' ? 'Mixed' : examLogModeText(entry.mode);
-      rows.push([entry.id, entry.timestamp, entry.student, modeText, entry.totalQuestions, entry.total, entry.correct, entry.helped,
+      rows.push([entry.id, entry.timestamp, entry.student, modeText, entry.totalQuestions, entry.total, entry.correct, entry.helped, entry.echoed || 0,
         entry.skipped, entry.incorrect, entry.pct, entry.helperManual, entry.helperAuto, entry.helperWrongAttempt]);
     });
     downloadFile('guide-my-pace-exam-session-summary-' + Date.now() + '.csv', rows.map(r => r.map(csvCell).join(',')).join('\r\n'), 'text/csv');
@@ -7141,94 +6037,6 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
     examNotesInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  // ---------- wire up ----------
-  loadBtn.addEventListener('click', loadText);
-
-  micBtn.addEventListener('click', function () {
-    primeTtsForSession();
-    if (isListening) stopListening();
-    else startListening();
-  });
-
-  resetBtn.addEventListener('click', function () {
-    stopListening();
-    stopLiveTimer();
-    clearHelperTimer();
-    if ('speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
-    ttsSpeaking = false;
-    muteRecognitionUntil = 0;
-    words.forEach(w => {
-      w.status = 'pending';
-      w.attempts = 0;
-      w.missGraceUsed = false;
-      w.heard = [];
-      w.correctionNote = null;
-      w.firstSeenAt = null;
-      w.resolvedAt = null;
-      w.durationMs = null;
-      w.helperTriggered = false;
-      w.helperUsedAt = null;
-      w.choralPrompted = false;
-      w.choralUsedAt = null;
-    });
-    choralNarratedChunkEnd = -1;
-    pointer = 0;
-    loggedThisAttempt = false;
-    lastWcpm = null;
-    lastElapsedMs = null;
-    lastOverallLexile = null;
-    lastBenchmark = null;
-    lastGradeLevel = null;
-    scoreBanner.style.display = 'none';
-    timingPanel.classList.remove('show');
-    timingPanel.innerHTML = '';
-    analysisPanel.classList.remove('show');
-    analysisPanel.innerHTML = '';
-    captionEl.textContent = '';
-    renderWords();
-    setStatus('Highlights reset — press "Start reading" when ready.');
-  });
-
-  finishBtn.addEventListener('click', function () { finishSession(false); });
-
-  exportWordCsvBtn.addEventListener('click', exportWordCsv);
-  exportSessionCsvBtn.addEventListener('click', exportSessionCsv);
-  exportJsonBtn.addEventListener('click', exportJsonLog);
-  clearLogBtn.addEventListener('click', clearLog);
-
-  coverToggle.addEventListener('change', function () {
-    revealControls.hidden = !coverToggle.checked;
-    renderWords();
-  });
-  revealWordsSelect.addEventListener('change', renderWords);
-  revealLinesSelect.addEventListener('change', renderWords);
-  maskColorPicker.addEventListener('input', function () { applyMaskColor(maskColorPicker.value); });
-
-  // ---------- app mode (Read / Exam) ----------
-  // Read mode's UI (typography, passage loading, the reading area, helper/choral controls) lives
-  // in #readModeSection; Exam mode gets its own section with its own layout. Both will keep
-  // sharing the same underlying engine below — speech recognition, the word-matching/scoring
-  // logic, and speakTts/the voice picker — only the on-screen presentation differs per mode.
-  function applyAppMode() {
-    const examSelected = modeExamRadio.checked;
-    document.body.classList.toggle('mode-exam', examSelected);
-    readModeSection.hidden = examSelected;
-    examModeSection.hidden = !examSelected;
-    subtitleText.innerHTML = examSelected
-      ? 'Load a question set, then work through it with reading support and answer-choice help.'
-      : 'Type or paste text, then read it aloud. Words turn <b style="color:#16a34a">green</b> as you read them correctly, <b style="color:#b45309">yellow</b> if you skip ahead past them, and <b style="color:#dc2626">red</b> if what you said didn\'t match.';
-    // The session log only ever tracks Read mode passages — keep it out of the way in Exam mode.
-    // Exam mode still logs every Submit in the background (see examLogSession) and exports the
-    // word-level CSV automatically from the Submit button — its own on-screen log card stays
-    // hidden in both modes (see #examSessionLogCard's `hidden` attribute).
-    sessionLogCard.hidden = examSelected;
-    // Don't leave a reading session listening in the background once its screen is hidden.
-    if (examSelected && isListening) stopListening();
-    if (!examSelected && examEngineListening) examEngineStop();
-  }
-  modeReadRadio.addEventListener('change', applyAppMode);
-  modeExamRadio.addEventListener('change', applyAppMode);
-
   // ---------- exam mode wiring ----------
   examLoadPdfBtn.addEventListener('click', function () {
     examPdfInput.click();
@@ -7289,6 +6097,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examEngineStop();
       return;
     }
+    // Archive whatever the PREVIOUSLY active target (an answer choice, or the passage) had
+    // accumulated, before switching away from it — see the matching comment in examToggleOptionPlay.
+    examDebugFinalizeLog();
     q.mode = examSpeakerMode ? 'speaker' : 'read';
     examEngineSwitchTo('question', q.words, examOnQuestionDone);
     examRenderQuestionArea();
@@ -7316,6 +6127,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
       examEngineStop();
       return;
     }
+    // Archive whatever the PREVIOUSLY active target (the stem, or an answer choice) had
+    // accumulated, before switching away from it — see the matching comment in examToggleOptionPlay.
+    // The passage itself is never archived this way (no log of its own — see examDebugRenderCapture).
+    examDebugFinalizeLog();
     examPassageMode = examSpeakerMode ? 'speaker' : 'read';
     examEngineResumePassage(examOnPassageDone);
     examRenderPassageWords();
@@ -7382,6 +6197,10 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   examSpeakerModeToggle.addEventListener('change', function () {
     examSpeakerMode = examSpeakerModeToggle.checked;
+    // The live capture transcript is only ever shown in Read/listen mode — re-render immediately
+    // so switching modes mid-session shows/hides it right away rather than waiting for the next
+    // recognition event.
+    examDebugRenderCapture(examDebugHeardSoFar);
   });
 
   examSpeakerRateSelect.addEventListener('change', function () {
@@ -7390,6 +6209,26 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
 
   examNaturalLanguageToggle.addEventListener('change', function () {
     examNaturalLanguageMode = examNaturalLanguageToggle.checked;
+  });
+
+  // Mutually exclusive, same as Read mode's own helperModeToggle/choralModeToggle pair (see those
+  // change listeners) and for the same reason — both involve the device speaking automatically, so
+  // running both at once for the same word/position would mean two competing auto-speak triggers.
+  examHelperModeToggle.addEventListener('change', function () {
+    if (examHelperModeToggle.checked) {
+      examChoralModeToggle.checked = false;
+      examScheduleHelperTimer();
+    } else {
+      examClearHelperTimer();
+    }
+  });
+
+  examChoralModeToggle.addEventListener('change', function () {
+    if (examChoralModeToggle.checked) {
+      examHelperModeToggle.checked = false;
+      examClearHelperTimer();
+      examMaybeNarrateChoralChunk();
+    }
   });
 
   examNotesExactMatchToggle.addEventListener('change', function () {
@@ -7413,6 +6252,9 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   examMarkupToggle.addEventListener('change', examRefreshTextMatches);
 
   examDebugModeToggle.addEventListener('change', function () {
+    // The live capture transcript is no longer gated by this — it shows by default whenever
+    // Speaker mode is off (see examDebugRenderCapture). This toggle now only controls whether
+    // Submit also logs the session and auto-downloads the word-level CSV.
     examDebugMode = examDebugModeToggle.checked;
   });
 
@@ -7470,37 +6312,11 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   examExportJsonBtn.addEventListener('click', examExportJsonLog);
   examClearLogBtn.addEventListener('click', examClearLog);
 
-  helperModeToggle.addEventListener('change', function () {
-    if (helperModeToggle.checked) {
-      choralModeToggle.checked = false;
-      scheduleHelperTimer();
-    } else {
-      clearHelperTimer();
-    }
-  });
-  helperDelaySelect.addEventListener('change', scheduleHelperTimer);
-
-  choralModeToggle.addEventListener('change', function () {
-    if (choralModeToggle.checked) {
-      helperModeToggle.checked = false;
-      clearHelperTimer();
-      maybeNarrateChoralChunk();
-    }
-  });
-
   fontSelect.addEventListener('change', applyTypography);
   letterSpacingRange.addEventListener('input', applyTypography);
   wordSpacingRange.addEventListener('input', applyTypography);
   lineHeightRange.addEventListener('input', applyTypography);
   resetTypoBtn.addEventListener('click', resetTypography);
-
-  // Line wrapping can change when the window is resized, so recompute which words fall on the
-  // current line (and which lines are "below") after resizing settles.
-  let resizeTimer = null;
-  window.addEventListener('resize', function () {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(renderWords, 150);
-  });
 
   // The very first speechSynthesis.speak() call in a page session can carry a real, sometimes
   // multi-second, startup delay while the browser's native TTS engine spins up — after that one
@@ -7520,19 +6336,14 @@ Try pasting in a passage with a few paragraphs — a blank line between them, li
   });
 
   // initial load
-  applyAppMode(); // sync body class / section visibility with whichever radio the browser restored
-  applyMaskColor('#9ca3af'); // default block color: gray
-  examApplyPassageMaskColor('#9ca3af'); // same default, but its own independent CSS variable
+  examApplyPassageMaskColor('#9ca3af'); // default passage-cover block color: gray
   applyTypography(); // default dyslexia-friendly typography
   if ('speechSynthesis' in window) {
     populateVoiceList();
     window.speechSynthesis.onvoiceschanged = populateVoiceList;
   }
-  loadLog();
-  renderLogPanel();
   examLoadLog();
   examRenderLogPanel();
-  loadText();
 })();
 </script>
 </body>
