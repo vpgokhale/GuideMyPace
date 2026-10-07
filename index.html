@@ -1848,6 +1848,18 @@
   // A candidate question is only kept once it has a non-empty stem and at least two options —
   // still inherently best-effort, which is exactly why the result always lands in editable
   // fields on the next screen rather than being trusted outright.
+  // A short, bare section banner ("Vocabulary", "Vocabulary Con't", "Map Skills", "Reading Skills")
+  // — a few words, no sentence-ending punctuation, no digits-led marker, no comma. Used by
+  // examSplitIntoQuestions to peel such a banner off the front of the stem it landed in front of.
+  function examIsSectionHeadingLine(text) {
+    const t = (text || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length > 40) return false;
+    if (/[.?!,;:]\s*$/.test(t) || t.indexOf(',') !== -1) return false;
+    if (/^\(?(?:\d{1,3}|[A-Za-z])\)?[.):]\s/.test(t)) return false;
+    if (t.split(' ').length > 5) return false;
+    return true;
+  }
+
   function examSplitIntoQuestions(text) {
     const raw = (text || '').replace(/\r/g, '');
     const lines = raw.split('\n');
@@ -1978,7 +1990,21 @@
       // just joins with a space, exactly as it always has.
       let stemText = '';
       let firstSeg = true;
-      pendingStem.forEach(function (seg) {
+      // A section heading that sits ahead of a numbered question in the source — "Vocabulary",
+      // "Vocabulary Con't", "Map Skills" — lands in the same run of unmatched lines as the stem
+      // itself (a page/section banner isn't any kind of option or marker), so it used to get
+      // glued on as the front of that question's stem. When the run contains a number-marked stem
+      // line ("9. What does…"), any leading heading-like lines before it are dropped: short, no
+      // sentence punctuation, never the numbered line itself, and only ever from the FRONT so a
+      // real multi-line stem or passage after them is untouched.
+      let segs = pendingStem;
+      const numIdx = segs.findIndex(function (seg) { return /^\s*\(?\d{1,3}[.):]\s+\S/.test(seg.text); });
+      if (numIdx > 0) {
+        let drop = 0;
+        while (drop < numIdx && examIsSectionHeadingLine(segs[drop].text)) drop++;
+        if (drop > 0) segs = segs.slice(drop);
+      }
+      segs.forEach(function (seg) {
         const cleaned = seg.text.replace(/\s+/g, ' ').trim();
         if (!cleaned) return;
         if (firstSeg) { stemText = cleaned; firstSeg = false; }
@@ -2071,11 +2097,37 @@
         });
       } else {
         let nextExpected = firstLabel;
-        lines.forEach(line => {
+        // A lettered option whose own punctuation got dropped in the source document — "A fort made
+        // of tall wooden walls." where its siblings read "B. A small boat…" / "C. A store…" — fails
+        // letterRe (which requires "A." / "A)" / "A:" with the marker glued on), so it would fall
+        // through as stem text, drag the following "B."/"C." lines into the stem too (they'd
+        // never be the "next expected" label), and swallow the rest of the question set into one
+        // giant stem. A bare single letter + space is ambiguous on its own ("A farmer…" is just a
+        // sentence starting with an article), so it's only accepted as a marker when the next
+        // non-blank line is the properly punctuated NEXT letter in sequence — "A …" followed by
+        // "B. …" — which an ordinary sentence essentially never produces. Letter style only.
+        const impliedMarker = {};
+        if (dominant === 'letter') {
+          const bareRe = /^\s*\(?([A-Za-z])\s+(\S.*)$/;
+          lines.forEach((line, idx) => {
+            if (re.test(line)) return;
+            const bm = line.match(bareRe);
+            if (!bm) return;
+            const wantNext = String.fromCharCode(bm[1].toUpperCase().charCodeAt(0) + 1);
+            for (let j = idx + 1; j < lines.length; j++) {
+              if (!lines[j].trim() || examIsImageSentinelLine(lines[j])) continue;
+              const nm = lines[j].match(re);
+              // The letter IS the first word here ("A fort…"), so the option text is the whole line.
+              if (nm && nm[1].toUpperCase() === wantNext) impliedMarker[idx] = [line, bm[1], line.replace(/^\s*\(?/, '').trim()];
+              break;
+            }
+          });
+        }
+        lines.forEach((line, lineIdx) => {
           if (!line.trim()) { blankSincePush = true; return; }
           if (examConsumeImageSentinel(line)) return;
           if (examConsumePassageSentinel(line)) return;
-          const m = line.match(re);
+          const m = line.match(re) || impliedMarker[lineIdx] || null;
           const label = m ? (dominant === 'letter' ? m[1].toUpperCase() : String(parseInt(m[1], 10))) : null;
           if (m && (label === nextExpected || label === firstLabel)) {
             if (label === firstLabel) { finalizeCurrent(); startNew(); }
