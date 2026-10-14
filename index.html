@@ -436,7 +436,7 @@
   /* Overrides the generic .word.masked rule above (higher specificity via the ID selector) so the
      exam passage's own "Cover unread text" color is independent of Read mode's --mask-color and of
      the exam answer-option masking's color (both of which keep using --mask-color, unchanged). */
-  #examPassageArea .word.masked {
+  #examPassageArea .word.masked, #examQuestionArea .word.masked {
     background: var(--exam-mask-color);
     color: transparent;
     box-shadow: none;
@@ -872,39 +872,40 @@
           <div class="cover-controls">
             <label class="cover-toggle-label">
               <input type="checkbox" id="examPassageCoverToggle">
-              Cover unread text (passage)
+              Cover unread text
             </label>
             <span class="color-field">
               Block color:
               <input type="color" id="examPassageMaskColorPicker" value="#9ca3af">
             </span>
-            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Blocks out the rest of the line and every line below it in the passage, so only what's already been read stays visible. Applies to the passage only, in both Speaker mode and Read/listen mode.</div></details>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Blocks out the rest of the line and every line below it — in the passage and in the question stem — so only what's already been read stays visible. Answer choices have their own cover (hidden until played). Applies in both Speaker mode and Read/listen mode.</div></details>
           </div>
 
           <div class="cover-controls" id="examPassageRevealControls" hidden>
             <span class="color-field">
               Reader Mode Word Cover:
               <select id="examPassageRevealWordsSelect">
-                <option value="0" selected>0</option>
-                <option value="1">1</option>
+                <option value="0">0</option>
+                <option value="1" selected>1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
                 <option value="4">4</option>
                 <option value="5">5</option>
                 <option value="6">6</option>
+                <option value="7">7</option>
               </select>
             </span>
             <span class="color-field">
               Reader Mode Line Cover:
               <select id="examPassageRevealLinesSelect">
-                <option value="0" selected>0</option>
-                <option value="1">1</option>
+                <option value="1" selected>1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
                 <option value="4">4</option>
+                <option value="5">5</option>
               </select>
             </span>
-            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">How many words ahead on the current line, and how many lines below it, stay visible anyway. Raise these gradually to fade the cover back as the reader needs less support.</div></details>
+            <details class="info-tip"><summary aria-label="More info">i</summary><div class="info-tip-body">Word Cover counts the current word as 1: 1 shows only the current word, 2 also shows the next word, and so on. 0 turns the word cover off, so the whole current line stays visible. Line Cover works the same way for lines: 1 shows only the current line, 2 also shows the line below it, and so on. Raise these gradually to fade the cover back as the reader needs less support.</div></details>
           </div>
 
           <!-- Highlights any exact phrase the current question's stem shares with the passage, so
@@ -1031,6 +1032,7 @@
 
       <div class="exam-inline-row">
         <button type="button" class="exam-play-btn" id="examQuestionPlayBtn" aria-label="Play — read the question aloud" title="Play — read the question aloud"><span id="examQuestionPlayIcon">▶</span></button>
+        <button type="button" class="exam-reset-btn" id="examQuestionResetBtn" aria-label="Reset — clear highlights and start the question over" title="Reset — clear highlights and start the question over">↺</button>
         <div class="reading-area exam-question-area" id="examQuestionArea"></div>
       </div>
       <div id="examQuestionImages" class="exam-question-images" hidden></div>
@@ -1147,6 +1149,7 @@
   const examPassagePlayBtn  = document.getElementById('examPassagePlayBtn');
   const examPassagePlayIcon = document.getElementById('examPassagePlayIcon');
   const examPassageResetBtn = document.getElementById('examPassageResetBtn');
+  const examQuestionResetBtn = document.getElementById('examQuestionResetBtn');
   const examPassageStatus   = document.getElementById('examPassageStatus');
   const examNavRow            = document.getElementById('examNavRow');
   const examPrevQuestionBtn   = document.getElementById('examPrevQuestionBtn');
@@ -1450,13 +1453,17 @@
       ? text.trim()
       : (examEngineListening ? 'Listening…' : '(not listening)');
 
+    // A stem/choice that is neither listening nor holding any heard text (e.g. right after its own
+    // Reset) has no live line to show — a bare "(not listening)" row under the archived history
+    // would just be noise.
+    const hasLive = !!((text && text.trim()) || examEngineListening);
     const questionLines = examDebugQuestionLog.slice();
-    if (examEngineTarget === 'question') questionLines.push(liveLine);
+    if (examEngineTarget === 'question' && hasLive) questionLines.push(liveLine);
     examDebugCaptureQuestion.hidden = questionLines.length === 0;
     examDebugCaptureQuestion.textContent = questionLines.join('\n');
 
     const optionLines = examDebugOptionLog.slice();
-    if (examEngineTarget === 'option' && examCurrentOptionIndex >= 0) {
+    if (examEngineTarget === 'option' && examCurrentOptionIndex >= 0 && hasLive) {
       optionLines.push(examDebugOptionLabel(examCurrentOptionIndex) + liveLine);
     }
     examDebugCaptureOption.hidden = optionLines.length === 0;
@@ -3910,14 +3917,22 @@
   // only touch a span whose full visual state (status, current, help-clickable, OR masked) has
   // actually changed. Masking never affects layout (it's a background/color swap, not
   // display:none), so reading spans[i].offsetTop here is safe regardless of current mask state.
-  function examComputePassageMask(spans) {
+  function examComputePassageMask(spans, pointerOverride) {
     const mask = new Array(spans.length).fill(false);
     if (!examPassageCoverToggle.checked || !spans.length) return mask;
-    const pointer = examPassageCoverPointer();
+    const pointer = pointerOverride != null ? pointerOverride : examPassageCoverPointer();
     if (pointer >= spans.length) return mask;
 
-    const revealWords = parseInt(examPassageRevealWordsSelect.value, 10) || 0;
-    const revealLines = parseInt(examPassageRevealLinesSelect.value, 10) || 0;
+    // Both dropdowns count the CURRENT word/line as position 1, so N means "reveal N including the
+    // one being read": Word Cover 1 = just the current word, 2 = it plus the next word, etc.; 0 is
+    // the special "no word cover" value — everything on the current line stays visible. Line Cover
+    // starts at 1 (just the current line); 2 also shows the line below, etc. Internally that's
+    // "how many words/lines AFTER the current one", i.e. N - 1.
+    const wordSel = parseInt(examPassageRevealWordsSelect.value, 10);
+    const lineSel = parseInt(examPassageRevealLinesSelect.value, 10);
+    const wholeLine = wordSel === 0;
+    const revealWords = wholeLine ? 0 : Math.max(0, (isNaN(wordSel) ? 1 : wordSel) - 1);
+    const revealLines = Math.max(0, (isNaN(lineSel) ? 1 : lineSel) - 1);
 
     const currentTop = spans[pointer].offsetTop;
 
@@ -3928,7 +3943,7 @@
       i++;
     }
 
-    const revealOnThisLine = Math.min(revealWords, sameLineCount);
+    const revealOnThisLine = wholeLine ? sameLineCount : Math.min(revealWords, sameLineCount);
     for (let k = pointer + 1; k < pointer + 1 + sameLineCount; k++) {
       if (k - (pointer + 1) >= revealOnThisLine) mask[k] = true;
     }
@@ -4100,20 +4115,24 @@
     });
   }
 
-  function examRenderQuestionArea() {
+  // Persistent word spans for the stem, same idea as the passage's (see examBuildPassageSpans /
+  // examRenderPassageWords): the DOM is rebuilt only when the active question (or its word list)
+  // actually changes; every per-tick render after that just updates the specific spans whose own
+  // visual state changed. This used to tear down and rebuild every span on every word, which made
+  // each grey "Cover unread text" block visibly flash whenever a single word was uncovered.
+  let examStemSpans = [];
+  let examStemBuiltFor = null; // { q, words, count } — what examStemSpans was last built from
+
+  function examBuildStemSpans(q) {
     examQuestionArea.innerHTML = '';
-    const q = examActiveQuestion();
-    if (!q) return;
-    // Same <p class="para-block"> grouping as the passage (see examBuildPassageSpans) — a plain
-    // single-line stem just gets one paragraph (no visible change), while a stem built from
-    // several original source lines (a category label, a quoted line, an instruction) keeps them
-    // on separate lines instead of running them all together. This area fully rebuilds on every
-    // call already (stems are short, unlike the passage, so that's never been a flicker concern),
-    // so no persistent-span bookkeeping is needed here the way the passage's own renderer needs it.
+    examStemSpans = [];
+    // Same <p class="para-block"> grouping as the passage — a plain single-line stem just gets one
+    // paragraph (no visible change), while a stem built from several original source lines (a
+    // category label, a quoted line, an instruction) keeps them on separate lines.
     let currentParaEl = null;
     let currentParaIdx = null;
     const paraTight = q.stemParaTight || [];
-    q.words.forEach((w, i) => {
+    q.words.forEach(w => {
       if (w.para !== currentParaIdx) {
         currentParaEl = document.createElement('p');
         currentParaEl.className = 'para-block' + (paraTight[w.para] ? ' tight' : '');
@@ -4121,18 +4140,55 @@
         currentParaIdx = w.para;
       }
       const span = document.createElement('span');
-      span.className = 'word ' + w.status;
-      const isCurrent = examEngineTarget === 'question' && i === examEnginePointer;
-      if (isCurrent) span.classList.add('current-target');
-      // No click-for-help in Speaker mode — the device is already reading everything aloud, so
-      // there's no STT-driven "stuck word" for a click to help with (see examEngineUsingSpeaker).
-      if (isCurrent && examEngineListening && !examEngineUsingSpeaker && w.status === 'pending') {
-        span.classList.add('help-clickable');
-        span.title = 'Click for help with this word';
-        span.addEventListener('click', function () { examRequestHelpForWord(); });
-      }
       span.textContent = w.raw;
       (currentParaEl || examQuestionArea).appendChild(span);
+      examStemSpans.push(span);
+    });
+    examStemBuiltFor = { q: q, words: q.words, count: q.words.length };
+  }
+
+  // Click-for-help, delegated once (spans are long-lived, and which one is clickable changes with
+  // the pointer — see examRenderPassageWords' own note on the same pattern).
+  examQuestionArea.addEventListener('click', function (event) {
+    if (event.target.closest('.word.help-clickable')) examRequestHelpForWord();
+  });
+
+  function examRenderQuestionArea() {
+    const q = examActiveQuestion();
+    if (!q) { examQuestionArea.innerHTML = ''; examStemSpans = []; examStemBuiltFor = null; return; }
+    if (!examStemBuiltFor || examStemBuiltFor.q !== q || examStemBuiltFor.words !== q.words ||
+        examStemBuiltFor.count !== q.words.length || examStemSpans.length !== q.words.length) {
+      examBuildStemSpans(q);
+    }
+    // "Cover unread text" also covers the question stem itself (not just the passage) — a worksheet
+    // with no separate reading passage has nothing but its stems to read. Same reveal-ahead logic
+    // and settings as the passage; the pointer is the live engine pointer while the stem is what's
+    // being read, else the first still-pending stem word (so a finished stem is fully uncovered and
+    // an untouched one starts from word one).
+    let mask = null;
+    if (examPassageCoverToggle.checked && examStemSpans.length) {
+      let pointer;
+      if (examEngineTarget === 'question') pointer = examEnginePointer;
+      else {
+        pointer = q.words.findIndex(w => w.status === 'pending');
+        if (pointer < 0) pointer = q.words.length;
+      }
+      mask = examComputePassageMask(examStemSpans, pointer);
+    }
+    q.words.forEach((w, i) => {
+      const span = examStemSpans[i];
+      const isCurrent = examEngineTarget === 'question' && i === examEnginePointer;
+      // No click-for-help in Speaker mode — the device is already reading everything aloud, so
+      // there's no STT-driven "stuck word" for a click to help with (see examEngineUsingSpeaker).
+      const isHelpClickable = isCurrent && examEngineListening && !examEngineUsingSpeaker && w.status === 'pending';
+      let desiredClass = 'word ' + w.status;
+      if (isCurrent) desiredClass += ' current-target';
+      if (isHelpClickable) desiredClass += ' help-clickable';
+      if (mask && mask[i]) desiredClass += ' masked';
+      if (span.className !== desiredClass) span.className = desiredClass;
+      if (span.textContent !== w.raw) span.textContent = w.raw;
+      const desiredTitle = isHelpClickable ? 'Click for help with this word' : '';
+      if (span.title !== desiredTitle) span.title = desiredTitle;
     });
   }
 
@@ -4251,6 +4307,15 @@
       playBtn.textContent = isListeningHere ? '■' : '▶';
       playBtn.addEventListener('click', function () { examToggleOptionPlay(idx); });
       row.appendChild(playBtn);
+
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'exam-reset-btn';
+      resetBtn.setAttribute('aria-label', 'Reset — clear highlights and start this choice over');
+      resetBtn.title = 'Reset — clear highlights and start this choice over';
+      resetBtn.textContent = '↺';
+      resetBtn.addEventListener('click', function () { examResetOption(idx); });
+      row.appendChild(resetBtn);
 
       // Multi-select ("select all N that apply") questions get an independent checkbox per option
       // instead of the usual single-answer radio group — see examParseMultiSelectRequirement /
@@ -4700,6 +4765,39 @@
   function examEngineSwitchTo(target, wordsArrRef, onDone) {
     if (examEngineListening) examEngineStop();
     examEngineLoad(target, wordsArrRef, onDone);
+  }
+
+  // True when a word list is part-way through a read — at least one word already resolved AND at
+  // least one still pending. That's the only state worth resuming into; a never-played list (all
+  // pending) or a finished one (none pending) both just start from the top.
+  function examCanResumeWords(words) {
+    return !!words && words.some(w => w.status === 'pending') && words.some(w => w.status !== 'pending');
+  }
+
+  // Generic resume-aware counterpart to examEngineSwitchTo, for the question stem and answer
+  // choices (the passage has its own, examEngineResumePassage below, which predates this): pressing
+  // Play again after Stop picks up at the first still-pending word instead of rewinding everything.
+  // Anything already resolved keeps its status/attempts/help state. A fresh or fully-read list has
+  // nothing to resume, so it falls through to examEngineLoad's full restart — same as before. When
+  // this exact list is also what the engine was last running (a plain pause/resume, nothing else
+  // played in between) the running transcript line carries on uninterrupted; otherwise (another
+  // target ran meanwhile, so the transcript accumulator now belongs to that one, which the caller has
+  // already archived) it starts a fresh line.
+  function examEngineResume(target, wordsArr, onDone) {
+    if (examEngineListening) examEngineStop();
+    if (!examCanResumeWords(wordsArr)) { examEngineLoad(target, wordsArr, onDone); return; }
+    const continuing = examEngineWords === wordsArr && examEngineTarget === target;
+    examClearHelperTimer();
+    examEngineTarget = target;
+    examEngineWords = wordsArr;
+    examEnginePointer = wordsArr.findIndex(w => w.status === 'pending');
+    examEngineOnDone = onDone;
+    examEngineCorrectionWords = [];
+    if (!continuing) {
+      examDebugHeardSoFar = '';
+      examDebugSyncOwnerTranscript(examDebugHeardSoFar);
+    }
+    examDebugRenderCapture(examDebugHeardSoFar);
   }
 
   // Resume-aware counterpart to examEngineSwitchTo, scoped to the passage only: picking Play back
@@ -5169,6 +5267,60 @@
     examUpdateReadyBtnGating();
   }
 
+  // Explicit "start this over" for the question stem (↺ beside its Play button) — the counterpart to
+  // examResetPassage now that Play itself resumes where a stopped read left off instead of always
+  // rewinding. Stops this stem if it's what's listening, files away whatever transcript it had
+  // gathered (same as replaying would), then puts every word back to pending. Deliberately leaves
+  // q.scored alone: the reader may already have moved on to notes/answer choices, and wanting to
+  // re-read the stem shouldn't lock those back up.
+  function examResetStem() {
+    const q = examActiveQuestion();
+    if (!q) return;
+    const isEngineStem = examEngineWords === q.words && examEngineTarget === 'question';
+    if (examEngineListening && isEngineStem) examEngineStop();
+    if (isEngineStem) {
+      examDebugFinalizeLog();
+      examDebugHeardSoFar = '';
+      examDebugSyncOwnerTranscript(examDebugHeardSoFar);
+      examClearHelperTimer();
+      examEnginePointer = 0;
+      examEngineCorrectionWords = [];
+    }
+    q.words.forEach(function (w) {
+      w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; w.choralPrompted = false;
+    });
+    examInvalidateChoralState();
+    examQuestionStatus.textContent = '';
+    examRenderQuestionArea();
+    examUpdatePlayButtons();
+    examDebugRenderCapture(examDebugHeardSoFar);
+  }
+
+  // Same idea for one answer choice (↺ beside its Play button). Leaves opt.scored/opt.revealed
+  // alone so the answer panel's gating (all choices read -> pick an answer) isn't undone by
+  // re-reading one — see examResetStem.
+  function examResetOption(idx) {
+    const q = examActiveQuestion();
+    if (!q || !q.options[idx]) return;
+    const opt = q.options[idx];
+    const isEngineOpt = examEngineWords === opt.words && examEngineTarget === 'option';
+    if (examEngineListening && isEngineOpt) examEngineStop();
+    if (isEngineOpt) {
+      if (examCurrentOptionIndex === idx) examDebugFinalizeLog();
+      examDebugHeardSoFar = '';
+      examDebugSyncOwnerTranscript(examDebugHeardSoFar);
+      examClearHelperTimer();
+      examEnginePointer = 0;
+      examEngineCorrectionWords = [];
+    }
+    opt.words.forEach(function (w) {
+      w.status = 'pending'; w.attempts = 0; w.heard = []; w.helperTriggered = false; w.helperSource = null; w.choralPrompted = false;
+    });
+    examInvalidateChoralState();
+    examRenderOptionsList();
+    examDebugRenderCapture(examDebugHeardSoFar);
+  }
+
   function examToggleOptionPlay(idx) {
     primeTtsForSession();
     if (!examSpeakerMode && !examEngineRecognition) {
@@ -5189,11 +5341,13 @@
     // choice) had accumulated — must happen before examCurrentOptionIndex/examEngineTarget change
     // below, since examDebugFinalizeLog reads both to know which log (and which label) to file it
     // under.
-    examDebugFinalizeLog();
+    // Skipped for a plain pause/resume of this same choice — see examQuestionPlayBtn's handler.
+    const resumingOpt = examCanResumeWords(q.options[idx].words) && examEngineWords === q.options[idx].words && examEngineTarget === 'option';
+    if (!resumingOpt) examDebugFinalizeLog();
     q.options[idx].revealed = true;
     q.options[idx].mode = examSpeakerMode ? 'speaker' : 'read';
     examCurrentOptionIndex = idx;
-    examEngineSwitchTo('option', q.options[idx].words, function () { examOnOptionDone(idx); });
+    examEngineResume('option', q.options[idx].words, function () { examOnOptionDone(idx); });
     examRenderOptionsList();
     examEngineStart();
   }
@@ -6151,9 +6305,12 @@
     }
     // Archive whatever the PREVIOUSLY active target (an answer choice, or the passage) had
     // accumulated, before switching away from it — see the matching comment in examToggleOptionPlay.
-    examDebugFinalizeLog();
+    // Skipped for a plain pause/resume of this same stem (it IS the previous target, and its
+    // transcript line should just carry on rather than being filed away and restarted).
+    const resumingStem = examCanResumeWords(q.words) && examEngineWords === q.words && examEngineTarget === 'question';
+    if (!resumingStem) examDebugFinalizeLog();
     q.mode = examSpeakerMode ? 'speaker' : 'read';
-    examEngineSwitchTo('question', q.words, examOnQuestionDone);
+    examEngineResume('question', q.words, examOnQuestionDone);
     examRenderQuestionArea();
     examQuestionStatus.textContent = examSpeakerMode ? 'Reading the question aloud…' : 'Listening… read the question aloud.';
     examEngineStart();
@@ -6191,6 +6348,7 @@
   });
 
   examPassageResetBtn.addEventListener('click', examResetPassage);
+  examQuestionResetBtn.addEventListener('click', examResetStem);
 
   examNotesInput.addEventListener('input', function () {
     const q = examActiveQuestion();
@@ -6292,13 +6450,14 @@
     if (q && q.optionsRevealed) examRenderOptionsList();
   });
 
+  function examRenderPassageAndStem() { examRenderPassageWords(); examRenderQuestionArea(); }
   examPassageCoverToggle.addEventListener('change', function () {
     examPassageRevealControls.hidden = !examPassageCoverToggle.checked;
-    examRenderPassageWords();
+    examRenderPassageAndStem();
   });
   examPassageMaskColorPicker.addEventListener('input', function () { examApplyPassageMaskColor(examPassageMaskColorPicker.value); });
-  examPassageRevealWordsSelect.addEventListener('change', examRenderPassageWords);
-  examPassageRevealLinesSelect.addEventListener('change', examRenderPassageWords);
+  examPassageRevealWordsSelect.addEventListener('change', examRenderPassageAndStem);
+  examPassageRevealLinesSelect.addEventListener('change', examRenderPassageAndStem);
 
   examTextMatchToggle.addEventListener('change', examRefreshTextMatches);
   examMarkupToggle.addEventListener('change', examRefreshTextMatches);
