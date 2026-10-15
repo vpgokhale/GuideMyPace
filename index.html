@@ -712,7 +712,7 @@
 <div class="wrap">
 
   <h1>🎙️ Guide My Pace</h1>
-  <p class="subtitle" id="subtitleText">An educational learning-support tool that helps students work through questions step by step.</p>
+  <p class="subtitle" id="subtitleText">An accessibility tool that does not store or collect any personal data from the responses or exported PDF.</p>
 
   <div class="unsupported" id="unsupported">
     Your browser doesn't support live speech recognition (the Web Speech API), so it can't listen and check your answers — <b>this is a Safari limitation</b> (Safari has never implemented this API, on desktop or iOS). Reading prompts aloud (text-to-speech) still works here, but for the full experience — listening to you read questions and answer choices — use <b>Google Chrome</b> or <b>Microsoft Edge</b> on desktop, with an internet connection and microphone access.
@@ -3238,8 +3238,35 @@
     return null;
   }
 
+  // "Which word does the answer replace?" marker. A word-swap grammar question ("their coarse,
+  // heavy fur are waterproof" -> answer "is") gives the app nothing to infer the target from when
+  // the answer is a bare word that appears nowhere in the quote, so the document's author can mark
+  // it right in the quoted phrase with square brackets: “their coarse, heavy fur [are] waterproof”
+  // (several words work too: [are going]). Only brackets INSIDE a quoted phrase count, so a stray
+  // "[...]" elsewhere in a stem is left alone. The brackets are stripped here, once, so they're never
+  // shown, read aloud, matched against speech or exported — what's kept is just where the marked
+  // words sit in the quote (see examUpdateMarkupEditForQuestion, the only consumer). Returns the
+  // stem with the markers removed, plus swap = { quote, start, len } (quote text with markers
+  // removed; start/len in WORDS) or null when there's no marker.
+  function examExtractSwapMarker(stem) {
+    const text = stem || '';
+    const qm = text.match(/([“"])([^”"]*\[[^\[\]]+\][^”"]*)([”"])/);
+    if (!qm) return { stem: text, swap: null };
+    const inner = qm[2];
+    const bm = inner.match(/\[([^\[\]]+)\]/);
+    const before = inner.slice(0, bm.index);
+    const cleanInner = inner.replace(/\[([^\[\]]+)\]/g, '$1');
+    const swap = {
+      quote: cleanInner.trim(),
+      start: before.split(/\s+/).filter(Boolean).length,
+      len: bm[1].split(/\s+/).filter(Boolean).length
+    };
+    return { stem: text.replace(qm[0], qm[1] + cleanInner + qm[3]), swap: swap };
+  }
+
   function examBuildQuestionEntry(stem, options, images, passageText) {
-    const cleanStem = examStripLeadingMarker(stem);
+    const swapExtracted = examExtractSwapMarker(examStripLeadingMarker(stem));
+    const cleanStem = swapExtracted.stem;
     // examSplitIntoQuestions marks a stem line that started fresh (a blank line separated it from
     // what came before — see its own pendingStem handling) with a tight paragraph break, so a
     // multi-line stem (a category label, a quoted line, an instruction, each on its own original
@@ -3248,6 +3275,7 @@
     const builtStem = examBuildPassageWords(cleanStem);
     return {
       raw: cleanStem,
+      swap: swapExtracted.swap, // see examExtractSwapMarker — null when the stem has no [marked] word
       words: builtStem.words,
       stemParaTight: builtStem.paraTight,
       scored: false,
@@ -3667,6 +3695,28 @@
     const opt = q.options[q.selectedAnswer];
     if (!opt) return;
     const arrowEdit = examParseOptionEdit(opt.raw);
+    // An author-marked word swap (see examExtractSwapMarker) is the most precise signal there is, so
+    // it's tried right after the explicit arrow shape and ahead of every guess-from-the-quote shape:
+    // the option replaces exactly the marked words, wherever the quote sits in the passage.
+    if (!arrowEdit && q.swap) {
+      const swapTo = examBuildWords(opt.raw);
+      const quoteWords = examBuildWords(q.swap.quote);
+      if (swapTo.length === q.swap.len && quoteWords.length) {
+        const quoteStart = examFindOptionEditTargetLoose(quoteWords, examPassageWords, null);
+        if (quoteStart !== -1) {
+          examMarkupEdits.set(idx, { start: quoteStart + q.swap.start, toWords: swapTo.map(w => w.raw) });
+          return;
+        }
+        // The full quote isn't in the passage verbatim — fall back to locating the marked words on
+        // their own, preferring this question's quoted-phrase match region.
+        const markedWords = quoteWords.slice(q.swap.start, q.swap.start + q.swap.len);
+        const markedStart = examFindOptionEditTargetLoose(markedWords, examPassageWords, examFindTextMatches(q.words, examPassageWords));
+        if (markedStart !== -1) {
+          examMarkupEdits.set(idx, { start: markedStart, toWords: swapTo.map(w => w.raw) });
+          return;
+        }
+      }
+    }
     const edit = arrowEdit
       || examParseOptionEditFromQuoted(q.raw, opt.raw)
       || examParseOptionEditFromQuotedWord(q.raw, opt.raw)
